@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>双方球队情报</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="detail-page">
+      <a class="back-link" href="index.html">返回赛程分析台</a>
+      <section class="detail-hero" id="detailHero"></section>
+      <section class="source-policy">
+        <h2>信息源优先级</h2>
+        <div class="source-grid">
+          <article>
+            <strong>事实层</strong>
+            <p>FIFA、国家队/足协官方、官方首发、官方发布会。</p>
+          </article>
+          <article>
+            <strong>结构化数据层</strong>
+            <p>ESPN、FBref、Transfermarkt、Sofascore 等，用于球员年龄、身高、俱乐部、联赛等级和近期数据。</p>
+          </article>
+          <article>
+            <strong>舆情层</strong>
+            <p>小红书、微博、Reddit 等只用于中文称呼、球迷观察和热度，不直接进入事实判断。</p>
+          </article>
+        </div>
+      </section>
+      <section class="team-detail-grid" id="teamDetailGrid"></section>
+    </main>
+
+    <script src="data.js"></script>
+    <script src="teams.js"></script>
+  </body>
+</html>

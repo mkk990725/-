@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>世界杯赛前分析台</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-block">
+          <div class="brand-mark">FT</div>
+          <div>
+            <h1>赛前分析台</h1>
+            <p>世界杯赛程 · 可解释筛选</p>
+          </div>
+        </div>
+
+        <div class="sync-panel">
+          <div>
+            <span class="muted-label">数据状态</span>
+            <strong>本地样本 · 可手动同步</strong>
+          </div>
+          <div class="sync-actions">
+            <button data-sync-mode="selected" type="button" title="同步当前日期范围内的世界杯比赛">同步赛程</button>
+          </div>
+        </div>
+
+        <div class="date-panel">
+          <div class="date-range-fields">
+            <label>
+              <span class="muted-label">开始日期</span>
+              <input id="dateStart" type="date" value="2026-06-17" />
+            </label>
+            <label>
+              <span class="muted-label">结束日期</span>
+              <input id="dateEnd" type="date" value="2026-06-17" />
+            </label>
+          </div>
+          <button id="applyDate" type="button">确定</button>
+          <label>
+            <span class="muted-label">排序</span>
+            <select id="sortMode">
+              <option value="score-desc">可分析度从高到低</option>
+              <option value="date-asc">比赛日期从近到远</option>
+              <option value="date-desc">比赛日期从远到近</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="filter-tabs" role="tablist" aria-label="比赛筛选">
+          <button class="active" data-filter="all" type="button">全部</button>
+          <button data-filter="actionable" type="button">推荐关注</button>
+          <button data-filter="watch" type="button">谨慎观察</button>
+          <button data-filter="avoid" type="button">建议跳过</button>
+          <button data-filter="synced" type="button">待补资料</button>
+          <button data-filter="review" type="button">已赛复盘</button>
+        </div>
+
+        <section class="ranking-panel">
+          <div class="ranking-head">
+            <span class="muted-label">未赛可分析度排行</span>
+            <strong id="rankingCount">0场</strong>
+          </div>
+          <div id="rankingList" class="ranking-list"></div>
+        </section>
+
+        <div class="match-list" id="matchList" aria-label="比赛列表"></div>
+      </aside>
+
+      <main class="main-panel">
+        <section class="match-hero" id="matchHero"></section>
+
+        <section class="module-grid" id="moduleGrid"></section>
+
+        <section class="content-grid">
+          <article class="primary-stack">
+            <div class="section-head">
+              <div>
+                <span class="muted-label">赛前初筛</span>
+                <h2>建议方向与规避项</h2>
+              </div>
+              <div class="confidence-ring" id="confidenceRing" aria-label="可分析度"></div>
+            </div>
+            <div class="verdict-grid" id="verdictGrid"></div>
+
+            <div class="section-head compact">
+              <div>
+                <span class="muted-label">比赛剧本</span>
+                <h2>上半场 / 全场</h2>
+              </div>
+            </div>
+            <div class="script-panel" id="scriptPanel"></div>
+          </article>
+
+          <aside class="side-stack">
+            <div class="section-head compact">
+              <div>
+                <span class="muted-label">判断依据</span>
+                <h2>因子评分</h2>
+              </div>
+            </div>
+            <div class="factor-note">
+              分数越高，表示该因子的信号越强；“不确定性”越高则越应该谨慎。
+            </div>
+            <div class="factor-list" id="factorList"></div>
+          </aside>
+        </section>
+
+        <section class="model-section">
+          <div class="section-head">
+            <div>
+              <span class="muted-label">模型版本 v0.2</span>
+              <h2>因子权重试验台</h2>
+            </div>
+            <p>这里不是正式模型训练，只用于观察不同因子升权或降权后，“可分析度”如何变化。</p>
+          </div>
+          <div class="weights-grid" id="weightsGrid"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
