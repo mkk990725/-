@@ -49,7 +49,7 @@ button {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 24px 18px;
   border-right: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.92);
@@ -119,6 +119,14 @@ h1 {
   font-size: 13px;
 }
 
+.sync-note {
+  max-width: 210px;
+  margin-top: 6px;
+  color: var(--subtle);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .sync-panel button,
 .filter-tabs button,
 .match-card,
@@ -145,6 +153,7 @@ h1 {
 .date-panel {
   display: grid;
   gap: 10px;
+  overflow: hidden;
   padding: 14px;
   margin-bottom: 16px;
   border: 1px solid var(--line);
@@ -156,6 +165,7 @@ h1 {
 .date-panel select,
 .date-panel button {
   width: 100%;
+  min-width: 0;
   min-height: 36px;
   padding: 0 10px;
   border: 1px solid var(--line);
@@ -168,6 +178,10 @@ h1 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+.date-range-fields label {
+  min-width: 0;
 }
 
 .date-panel button {
@@ -200,9 +214,9 @@ h1 {
   display: grid;
   align-content: start;
   gap: 10px;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   min-height: 0;
-  overflow-y: visible;
+  overflow-y: auto;
   padding-right: 4px;
 }
 

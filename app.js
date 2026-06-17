@@ -120,12 +120,14 @@ function isFutureMatch(match) {
   return match.score === "未赛" || match.status !== "review";
 }
 
+function matchesDateRange(match) {
+  if (!state.dateStart || !state.dateEnd) return true;
+  const [start, end] = normalizeDateRange(state.dateStart, state.dateEnd);
+  return match.date >= start && match.date <= end;
+}
+
 function visibleMatches() {
-  let matches = window.WORLD_CUP_FIXTURES;
-  if (state.dateStart && state.dateEnd) {
-    const [start, end] = normalizeDateRange(state.dateStart, state.dateEnd);
-    matches = matches.filter((match) => match.date >= start && match.date <= end);
-  }
+  let matches = window.WORLD_CUP_FIXTURES.filter(matchesDateRange);
   if (state.filter !== "all") {
     matches = matches.filter((match) => match.status === state.filter);
   }
@@ -320,12 +322,33 @@ function makeSyncedMatch(event) {
   };
 }
 
+function matchKey(match) {
+  return `${match.date}|${match.home}|${match.away}`;
+}
+
+function mergeMatch(existing, incoming) {
+  existing.espnId = incoming.id;
+  existing.venue = existing.venue || incoming.venue;
+  existing.group = existing.group || incoming.group;
+  if (incoming.score !== "未赛") {
+    existing.score = incoming.score;
+    existing.status = "review";
+    existing.resultNote = incoming.resultNote;
+  }
+  if (existing.status === "synced") {
+    Object.assign(existing, incoming);
+  }
+}
+
 function mergeSyncedMatches(events) {
   const synced = events.map(makeSyncedMatch);
   const existingById = new Map(window.WORLD_CUP_FIXTURES.map((match) => [match.id, match]));
+  const existingByKey = new Map(window.WORLD_CUP_FIXTURES.map((match) => [matchKey(match), match]));
   synced.forEach((match) => {
     if (existingById.has(match.id)) {
       Object.assign(existingById.get(match.id), match);
+    } else if (existingByKey.has(matchKey(match))) {
+      mergeMatch(existingByKey.get(matchKey(match)), match);
     } else {
       window.WORLD_CUP_FIXTURES.push(match);
     }
@@ -479,7 +502,7 @@ function renderScripts(match) {
 }
 
 function renderRanking() {
-  const candidates = sortMatches(window.WORLD_CUP_FIXTURES.filter(isFutureMatch));
+  const candidates = sortMatches(window.WORLD_CUP_FIXTURES.filter((match) => isFutureMatch(match) && matchesDateRange(match)));
   el.rankingCount.textContent = `${candidates.length}场`;
   el.rankingList.innerHTML = candidates.map((match, index) => {
     const score = normalizedAnalysisScore(match);
@@ -608,9 +631,15 @@ async function syncScoreboard(mode) {
 
   try {
     const payloads = await Promise.all(dateKeys.map(fetchScoreboard));
-    const events = payloads.flatMap((payload) => payload.events || []);
+    const [start, end] = normalizeDateRange(state.dateStart || formatIsoDate(), state.dateEnd || state.dateStart || formatIsoDate());
+    const events = payloads
+      .flatMap((payload) => payload.events || [])
+      .filter((event) => {
+        const eventDate = event.date?.slice(0, 10);
+        return eventDate && eventDate >= start && eventDate <= end;
+      });
     mergeSyncedMatches(events);
-    state.syncNotice = start === end ? `ESPN ${start} · ${events.length} 场` : `ESPN ${start} 至 ${end} · ${events.length} 场`;
+    state.syncNotice = start === end ? `ESPN ${start} · 显示 ${events.length} 场` : `ESPN ${start} 至 ${end} · 显示 ${events.length} 场`;
     const firstVisible = visibleMatches()[0] || window.WORLD_CUP_FIXTURES.find((match) => match.id.startsWith("espn-"));
     if (firstVisible) state.selectedId = firstVisible.id;
   } catch (error) {

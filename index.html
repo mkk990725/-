@@ -21,6 +21,7 @@
           <div>
             <span class="muted-label">数据状态</span>
             <strong>本地样本 · 可手动同步</strong>
+            <p class="sync-note">同步只更新赛程/比分/盘口摘要；当前尚未接入大模型自动分析。</p>
           </div>
           <div class="sync-actions">
             <button data-sync-mode="selected" type="button" title="同步当前日期范围内的世界杯比赛">同步赛程</button>
@@ -60,7 +61,7 @@
 
         <section class="ranking-panel">
           <div class="ranking-head">
-            <span class="muted-label">未赛可分析度排行</span>
+            <span class="muted-label">当前日期范围 · 未赛排行</span>
             <strong id="rankingCount">0场</strong>
           </div>
           <div id="rankingList" class="ranking-list"></div>
