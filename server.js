@@ -12,6 +12,7 @@ const PLAYER_DIR = path.join(CACHE_DIR, "players");
 const TEAM_CACHE = path.join(CACHE_DIR, "teams.json");
 const MODEL_CONFIG = path.join(__dirname, "model-config.json");
 const PREMATCH_SKILL = path.join(__dirname, "agent-skills", "prematch-analysis.md");
+const LEARNING_SKILL = path.join(__dirname, "agent-skills", "learning-failures.md");
 const PREDICTION_CACHE = path.join(CACHE_DIR, "predictions.json");
 const SQUAD_TTL_MS = Number(process.env.SQUAD_TTL_HOURS || 12) * 60 * 60 * 1000;
 const PLAYER_TTL_MS = Number(process.env.PLAYER_TTL_HOURS || 48) * 60 * 60 * 1000;
@@ -310,7 +311,7 @@ function translateCountry(country) {
 
 function translateClub(club) {
   if (!club) return "";
-  return CLUB_ZH[club] || `${club}（中文名待校验）`;
+  return CLUB_ZH[club] || club;
 }
 
 function translatePlayerName(name) {
@@ -410,6 +411,7 @@ async function enrichPlayers(players) {
     nationalityZh: translateCountry(player.nationality),
     club: profiles[index]?.club || "",
     clubZh: profiles[index]?.clubZh || "",
+    marketValue: profiles[index]?.marketValue || "",
     profileSource: profiles[index]?.source || ""
   }));
 }
@@ -513,6 +515,10 @@ function readPrematchSkill() {
   return fs.existsSync(PREMATCH_SKILL) ? fs.readFileSync(PREMATCH_SKILL, "utf8") : "";
 }
 
+function readLearningSkill() {
+  return fs.existsSync(LEARNING_SKILL) ? fs.readFileSync(LEARNING_SKILL, "utf8") : "";
+}
+
 function compactTeamDetail(detail) {
   return {
     team: detail.team,
@@ -531,7 +537,7 @@ function compactTeamDetail(detail) {
       height: player.heightCm || player.height,
       weight: player.weightKg || player.weight,
       club: player.clubZh || player.club,
-      nationality: player.nationalityZh || player.nationality
+      marketValue: player.marketValue || ""
     })),
     warning: detail.warning
   };
@@ -551,11 +557,29 @@ function buildEvaluationPrompt(analysisInput, config) {
   const skill = readPrematchSkill();
   return [
     "你是赛前足球分析智能体。你的目标不是评价页面，而是基于输入信息分析比赛走势。",
-    "必须输出：1）是否可分析/是否建议跳过；2）上半场走势；3）全场走势边界；4）最关键证据；5）信息缺口；6）来源可靠性；7）不确定性。",
-    "不要承诺精确比分，不要承诺稳定盈利。可以给倾向，但必须说明证据强弱和过滤纪律。",
+    "大模型负责主要分析与判断；技能只告诉你如何使用数据、如何过滤、如何表达不确定性，不要把技能写成死板打分公式。",
+    "必须先做信息源充足性与真实性校验：区分官方事实、结构化数据、媒体报道、舆情线索、模型推断；识别未经交叉验证的伤停、首发、战术烟雾弹和市场噪声。信息源不足时必须降级或跳过。",
+    "必须输出：1）是否可分析/是否建议跳过；2）信息源校验；3）上半场走势；4）全场走势边界；5）最关键证据；6）信息缺口；7）来源可靠性；8）不确定性；9）娱乐参考的前三个比分与半全场选项。",
+    "不要承诺精确比分，不要承诺稳定盈利。娱乐比分和半全场只能标注为娱乐参考，不能作为投资建议。",
+    "建议输出 JSON，字段至少包含 source_check、is_analyzable、filter_reason、first_half、full_time、key_evidence、information_gaps、source_reliability、uncertainty、entertainment_top3。",
     `分析技能：\n${skill}`,
     `当前配置：${JSON.stringify(config)}`,
     `比赛与球队输入：${JSON.stringify(analysisInput)}`
+  ].join("\n\n");
+}
+
+function buildReviewPrompt({ match, prediction }, config) {
+  const prematchSkill = readPrematchSkill();
+  const learningSkill = readLearningSkill();
+  return [
+    "你是赛后复盘智能体。请对照赛前预测和已赛真实情况，评估预测哪里正确、哪里失败，以及失败原因。",
+    "必须按维度比较：信息源校验、上半场走势、全场走势、关键球员/教练决策、赛程动机、市场校验、娱乐比分/半全场。",
+    "给出 0-100 的预测得分，并解释扣分点。最后根据学习失败经验 skill，提出需要调整的分析技能、需要补充的信息源、需要摒弃的噪声信息。",
+    `赛前分析技能：\n${prematchSkill}`,
+    `学习失败经验技能：\n${learningSkill}`,
+    `当前配置：${JSON.stringify(config)}`,
+    `已赛真实情况：${JSON.stringify(match)}`,
+    `赛前预测：${JSON.stringify(prediction)}`
   ].join("\n\n");
 }
 
@@ -585,6 +609,42 @@ async function evaluateWithModel(match, config) {
       model: llmModel,
       messages: [
         { role: "system", content: "你是严谨的足球赛前分析师。你分析比赛走势和过滤纪律，禁止承诺稳定盈利。" },
+        { role: "user", content: prompt }
+      ],
+      temperature: Number(config.model?.temperature ?? 0.2)
+    })
+  });
+  if (!response.ok) throw new Error(`LLM HTTP ${response.status}`);
+  return {
+    ok: true,
+    mode: "llm",
+    result: await response.json()
+  };
+}
+
+async function reviewPrediction(match, prediction, config) {
+  const prompt = buildReviewPrompt({ match, prediction }, config);
+  const llmApiUrl = config.model?.apiUrl || process.env.LLM_API_URL;
+  const llmApiKey = config.model?.apiKey || process.env.LLM_API_KEY;
+  const llmModel = config.model?.model || process.env.LLM_MODEL;
+  if (!llmApiUrl || !llmApiKey || !llmModel) {
+    return {
+      ok: false,
+      mode: "prompt-only",
+      warning: "未配置 API URL / API Key / 模型名，已返回可直接发送给大模型的赛后复盘输入包。",
+      prompt
+    };
+  }
+  const response = await fetch(llmApiUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${llmApiKey}`
+    },
+    body: JSON.stringify({
+      model: llmModel,
+      messages: [
+        { role: "system", content: "你是严谨的足球赛后复盘分析师。你要找出预测失败原因，并改进下一次输入和技能。" },
         { role: "user", content: prompt }
       ],
       temperature: Number(config.model?.temperature ?? 0.2)
@@ -638,7 +698,12 @@ async function getTeamDetail(teamName) {
 
   if (isFresh(cacheFile, SQUAD_TTL_MS)) {
     const cached = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
-    const needsPlayerRefresh = cached.players?.some((player) => !player.heightCm || !player.nameZh || player.clubZh?.includes("待校验"));
+    const needsPlayerRefresh = cached.players?.some((player) => (
+      !player.heightCm
+      || !player.nameZh
+      || !Object.prototype.hasOwnProperty.call(player, "marketValue")
+      || player.clubZh?.includes("待校验")
+    ));
     if (needsPlayerRefresh) {
       cached.players = await enrichPlayers(cached.players);
       cached.fetchedAt = new Date().toISOString();
@@ -773,6 +838,12 @@ async function handleApi(req, res, url) {
     if (req.method !== "POST") return jsonResponse(res, 405, { error: "POST required" });
     const body = await readRequestBody(req);
     return jsonResponse(res, 200, await predictMatch(body.match));
+  }
+
+  if (url.pathname === "/api/review-prediction") {
+    if (req.method !== "POST") return jsonResponse(res, 405, { error: "POST required" });
+    const body = await readRequestBody(req);
+    return jsonResponse(res, 200, await reviewPrediction(body.match, body.prediction, readModelConfig()));
   }
 
   if (url.pathname === "/api/sync-now") {

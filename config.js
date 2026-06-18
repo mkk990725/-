@@ -9,6 +9,7 @@ const factorLabels = window.FACTOR_META || {
 };
 
 const inputLabels = {
+  includeSourceSufficiencyCheck: "信息源充足性与真实性校验",
   includeCoachProfile: "主教练履历与执行风格",
   includeCoachAdjustmentHistory: "相似比赛调整记录",
   includeSquadAndPlayerPhysicals: "大名单、年龄、身体条件",
@@ -18,7 +19,7 @@ const inputLabels = {
   includeTacticalMatchup: "战术对位",
   includeMotivationSchedule: "小组形势与赛程动机",
   includeMarketCheck: "市场校验",
-  includeSourceReliability: "来源可靠性"
+  includeSourceReliability: "来源可靠性与烟雾弹识别"
 };
 
 const defaultConfig = {

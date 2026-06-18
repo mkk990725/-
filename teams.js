@@ -66,7 +66,7 @@ function renderPlayerRows(players) {
             <th>身高</th>
             <th>体重</th>
             <th>俱乐部</th>
-            <th>国籍</th>
+            <th>身价</th>
           </tr>
         </thead>
         <tbody>
@@ -81,8 +81,8 @@ function renderPlayerRows(players) {
               <td>${escapeHtml(player.age || "-")}</td>
               <td>${escapeHtml(player.heightCm || player.height || "-")}</td>
               <td>${escapeHtml(player.weightKg || player.weight || "-")}</td>
-              <td>${escapeHtml(player.clubZh || player.club || "待校验")}</td>
-              <td>${escapeHtml(player.nationalityZh || player.nationality || "-")}</td>
+              <td>${escapeHtml(player.clubZh || player.club || "待接入")}</td>
+              <td>${escapeHtml(player.marketValue || "待接入")}</td>
             </tr>
           `).join("")}
         </tbody>

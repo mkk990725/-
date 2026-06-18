@@ -532,6 +532,26 @@ h1 {
   font: 13px/1.55 "Consolas", "Microsoft YaHei", monospace;
 }
 
+.review-card {
+  padding: 14px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfa;
+}
+
+.review-card strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink);
+}
+
+.review-card p {
+  margin: 6px 0 0;
+  color: var(--subtle);
+  line-height: 1.6;
+}
+
 .match-hero {
   position: relative;
   overflow: hidden;

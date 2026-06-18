@@ -5,6 +5,7 @@ const state = {
   dateEnd: "2026-06-17",
   sortMode: "score-desc",
   predictions: {},
+  reviews: {},
   weights: {
     strength: 1.25,
     coach: 1.2,
@@ -81,7 +82,6 @@ const el = {
   script: document.getElementById("scriptPanel"),
   factors: document.getElementById("factorList"),
   ring: document.getElementById("confidenceRing"),
-  moduleGrid: document.getElementById("moduleGrid"),
   dateStart: document.getElementById("dateStart"),
   dateEnd: document.getElementById("dateEnd"),
   applyDate: document.getElementById("applyDate"),
@@ -163,14 +163,14 @@ function visibleMatches() {
 
 function sortMatches(matches) {
   return [...matches].sort((a, b) => {
+    const predicted = Number(Boolean(predictionFor(b))) - Number(Boolean(predictionFor(a)));
     if (state.sortMode === "score-desc") {
-      const predicted = Number(Boolean(predictionFor(b))) - Number(Boolean(predictionFor(a)));
       return predicted || a.date.localeCompare(b.date);
     }
     if (state.sortMode === "date-desc") {
-      return b.date.localeCompare(a.date) || normalizedAnalysisScore(b) - normalizedAnalysisScore(a);
+      return b.date.localeCompare(a.date) || predicted || (a.kickoffTime || "").localeCompare(b.kickoffTime || "");
     }
-    return a.date.localeCompare(b.date) || normalizedAnalysisScore(b) - normalizedAnalysisScore(a);
+    return a.date.localeCompare(b.date) || predicted || (a.kickoffTime || "").localeCompare(b.kickoffTime || "");
   });
 }
 
@@ -392,14 +392,41 @@ function mergeMatch(existing, incoming) {
   existing.group = existing.group || incoming.group;
   existing.utcDate = incoming.utcDate;
   existing.kickoffTime = incoming.kickoffTime;
-  if (incoming.score !== "未赛") {
+  if (incoming.score !== "未赛" || incoming.status === "review") {
     existing.score = incoming.score;
     existing.status = "review";
     existing.resultNote = incoming.resultNote;
+    existing.headline = incoming.headline;
+    existing.recommendation = incoming.recommendation;
   }
   if (existing.status === "synced") {
     Object.assign(existing, incoming);
   }
+}
+
+function statusPriority(match) {
+  if (match.status === "review" || match.score !== "未赛") return 3;
+  if (match.status === "watch") return 2;
+  if (match.status === "actionable") return 1;
+  return 0;
+}
+
+function dedupeMatchesByKey() {
+  const merged = new Map();
+  window.WORLD_CUP_FIXTURES.forEach((match) => {
+    const key = matchKey(match);
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, match);
+      return;
+    }
+    const keepIncoming = statusPriority(match) > statusPriority(existing);
+    const primary = keepIncoming ? match : existing;
+    const secondary = keepIncoming ? existing : match;
+    mergeMatch(primary, secondary);
+    merged.set(key, primary);
+  });
+  window.WORLD_CUP_FIXTURES = [...merged.values()];
 }
 
 function mergeSyncedMatches(events) {
@@ -415,6 +442,7 @@ function mergeSyncedMatches(events) {
       window.WORLD_CUP_FIXTURES.push(match);
     }
   });
+  dedupeMatchesByKey();
   window.WORLD_CUP_FIXTURES.sort((a, b) => a.date.localeCompare(b.date) || a.home.localeCompare(b.home, "zh-CN"));
 }
 
@@ -493,38 +521,29 @@ function renderHero(match) {
   `;
 }
 
-function renderModules(match) {
-  const teamsHref = `teams.html?match=${encodeURIComponent(match.id)}`;
-  const predictHref = `predict.html?match=${encodeURIComponent(match.id)}`;
-  el.moduleGrid.innerHTML = `
-    <a class="module-card accent" href="${predictHref}">
-      <span>01</span>
-      <strong>生成预测</strong>
-      <p>进入预测模块，选择日期和比赛后调用大模型。</p>
-    </a>
-    <a class="module-card" href="#matchScript" data-scroll-target="matchScript">
-      <span>02</span>
-      <strong>比赛剧本</strong>
-      <p>上半场开局、全场走势边界和关键情景。</p>
-    </a>
-    <a class="module-card" href="#factorSection" data-scroll-target="factorSection">
-      <span>03</span>
-      <strong>判断依据</strong>
-      <p>因子摘要和可展开来源要求。</p>
-    </a>
-    <a class="module-card accent" href="${teamsHref}">
-      <span>04</span>
-      <strong>球队情报</strong>
-      <p>${match.home} / ${match.away} 教练、阵容和球员资料入口。</p>
-    </a>
-  `;
-}
-
 function renderVerdicts(match) {
   const prediction = predictionFor(match);
-  el.predictionResult.innerHTML = prediction
+  const review = state.reviews[match.id];
+  const actualPanel = match.status === "review" ? `
+    <div class="review-card">
+      <strong>已赛真实情况（自动同步）</strong>
+      <p>${match.home} ${match.score} ${match.away}</p>
+      <p>${match.resultNote || "已完赛，详细过程数据待补充。"}</p>
+    </div>
+  ` : "";
+  const comparePanel = match.status === "review" && prediction ? `
+    <div class="review-card">
+      <strong>预测情况对比</strong>
+      <p>预测得分：${review ? "见下方复盘结果" : "待大模型复盘评分"}</p>
+      <p>复盘会对照上半场走势、全场走势、关键证据、信息缺口和最终比分逐项解释偏差。</p>
+      <button class="secondary-action" type="button" data-review-match="${match.id}">调用大模型复盘</button>
+    </div>
+  ` : "";
+  const reviewPanel = review ? `<pre>${JSON.stringify(review.result || review, null, 2)}</pre>` : "";
+  const predictionPanel = prediction
     ? `<pre>${JSON.stringify(prediction.result || prediction, null, 2)}</pre>`
     : `<div class="empty-state">这场比赛还没有大模型预测结果。请进入预测模块生成。</div>`;
+  el.predictionResult.innerHTML = `${actualPanel}${predictionPanel}${comparePanel}${reviewPanel}`;
   if (el.predictLink) el.predictLink.href = `predict.html?match=${encodeURIComponent(match.id)}`;
 }
 
@@ -541,7 +560,6 @@ function render() {
   const match = getSelectedMatch();
   renderMatchList();
   renderHero(match);
-  renderModules(match);
   renderVerdicts(match);
   renderScripts(match);
   renderFactors(match);
@@ -575,13 +593,27 @@ el.sortMode.addEventListener("change", () => {
   render();
 });
 
-el.moduleGrid.addEventListener("click", (event) => {
-  const link = event.target.closest("[data-scroll-target]");
-  if (!link) return;
-  const target = document.getElementById(link.dataset.scrollTarget);
-  if (!target) return;
-  event.preventDefault();
-  target.scrollIntoView({ behavior: "smooth", block: "start" });
+el.predictionResult.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-review-match]");
+  if (!button) return;
+  const match = getSelectedMatch();
+  const prediction = predictionFor(match);
+  if (!prediction) return;
+  button.disabled = true;
+  button.textContent = "复盘中";
+  try {
+    const response = await fetch("/api/review-prediction", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ match, prediction })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    state.reviews[match.id] = await response.json();
+  } catch (error) {
+    state.reviews[match.id] = { ok: false, error: error.message };
+  } finally {
+    renderVerdicts(match);
+  }
 });
 
 loadPredictions()
