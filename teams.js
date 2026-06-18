@@ -74,7 +74,8 @@ function renderPlayerRows(players) {
             <tr>
               <td>${escapeHtml(player.jersey || "-")}</td>
               <td>
-                ${player.href ? `<a href="${escapeHtml(player.href)}" target="_blank" rel="noreferrer">${escapeHtml(player.name)}</a>` : escapeHtml(player.name)}
+                ${player.href ? `<a href="${escapeHtml(player.href)}" target="_blank" rel="noreferrer">${escapeHtml(player.nameZh || player.name)}</a>` : escapeHtml(player.nameZh || player.name)}
+                ${player.nameZh ? `<span class="player-original">${escapeHtml(player.name)}</span>` : ""}
               </td>
               <td>${escapeHtml(player.positionZh || player.position || "-")}</td>
               <td>${escapeHtml(player.age || "-")}</td>

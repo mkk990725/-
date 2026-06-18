@@ -8,33 +8,46 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="detail-page">
-      <nav class="side-nav page-nav" aria-label="页面导航">
-        <a href="index.html">比赛分析</a>
-        <a href="config.html">模型配置</a>
-        <a class="active" href="teams.html">球队资料</a>
-      </nav>
-      <a class="back-link" href="index.html">返回赛程分析台</a>
-      <section class="detail-hero" id="detailHero"></section>
-      <section class="source-policy">
-        <h2>信息源优先级</h2>
-        <div class="source-grid">
-          <article>
-            <strong>事实层</strong>
-            <p>FIFA、国家队/足协官方、官方首发、官方发布会。</p>
-          </article>
-          <article>
-            <strong>结构化数据层</strong>
-            <p>ESPN、FBref、Transfermarkt、Sofascore 等，用于球员年龄、身高、俱乐部、联赛等级和近期数据。</p>
-          </article>
-          <article>
-            <strong>舆情层</strong>
-            <p>小红书、微博、Reddit 等只用于中文称呼、球迷观察和热度，不直接进入事实判断。</p>
-          </article>
+    <div class="config-shell">
+      <aside class="config-nav">
+        <div class="brand-block">
+          <div class="brand-mark"><img src="favicon.svg" alt="" /></div>
+          <div>
+            <h1>球队资料</h1>
+            <p>教练、球员、来源校验</p>
+          </div>
         </div>
-      </section>
-      <section class="team-detail-grid" id="teamDetailGrid"></section>
-    </main>
+        <nav class="side-nav" aria-label="页面导航">
+          <a href="index.html">比赛分析</a>
+          <a href="config.html">模型配置</a>
+          <a class="active" href="teams.html">球队资料</a>
+          <a href="skills.html">分析技能</a>
+        </nav>
+      </aside>
+
+      <main class="config-main">
+        <a class="back-link" href="index.html">返回赛程分析台</a>
+        <section class="detail-hero" id="detailHero"></section>
+        <section class="source-policy">
+          <h2>信息源优先级</h2>
+          <div class="source-grid">
+            <article>
+              <strong>事实层</strong>
+              <p>FIFA、国家队/足协官方、官方首发、官方发布会。</p>
+            </article>
+            <article>
+              <strong>结构化数据层</strong>
+              <p>ESPN、FBref、Transfermarkt、Sofascore，用于球员年龄、身高、体重、俱乐部、联赛等级和近期数据。</p>
+            </article>
+            <article>
+              <strong>舆情层</strong>
+              <p>懂球帝、小红书、微博、Reddit 只用于中文称呼、线索发现和热度观察，不直接进入事实判断。</p>
+            </article>
+          </div>
+        </section>
+        <section class="team-detail-grid" id="teamDetailGrid"></section>
+      </main>
+    </div>
 
     <script src="data.js"></script>
     <script src="teams.js"></script>

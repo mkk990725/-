@@ -270,6 +270,35 @@ const CLUB_ZH = {
   "Real Sociedad": "皇家社会"
 };
 
+const PLAYER_NAME_ZH = {
+  "Diogo Costa": "迪奥戈·科斯塔",
+  "José Sá": "若泽·萨",
+  "Rui Silva": "鲁伊·席尔瓦",
+  "Nélson Semedo": "内尔松·塞梅多",
+  "Rúben Dias": "鲁本·迪亚斯",
+  "Tomás Araújo": "托马斯·阿劳若",
+  "Diogo Dalot": "迪奥戈·达洛特",
+  "Gonçalo Inácio": "贡萨洛·伊纳西奥",
+  "João Cancelo": "若昂·坎塞洛",
+  "Nuno Mendes": "努诺·门德斯",
+  "Matheus Nunes": "马特乌斯·努内斯",
+  "Bruno Fernandes": "布鲁诺·费尔南德斯",
+  "Bernardo Silva": "贝尔纳多·席尔瓦",
+  "Renato Veiga": "雷纳托·韦加",
+  "João Neves": "若昂·内维斯",
+  "Rúben Neves": "鲁本·内维斯",
+  "Vitinha": "维蒂尼亚",
+  "Samú Costa": "萨穆·科斯塔",
+  "Cristiano Ronaldo": "克里斯蒂亚诺·罗纳尔多",
+  "Gonçalo Ramos": "贡萨洛·拉莫斯",
+  "João Félix": "若昂·菲利克斯",
+  "Francisco Trincão": "弗朗西斯科·特林康",
+  "Rafael Leão": "拉斐尔·莱奥",
+  "Pedro Neto": "佩德罗·内托",
+  "Gonçalo Guedes": "贡萨洛·格德斯",
+  "Francisco Conceição": "弗朗西斯科·孔塞桑"
+};
+
 function translatePosition(position) {
   return POSITION_ZH[position] || position || "-";
 }
@@ -281,6 +310,10 @@ function translateCountry(country) {
 function translateClub(club) {
   if (!club) return "";
   return CLUB_ZH[club] || `${club}（中文名待校验）`;
+}
+
+function translatePlayerName(name) {
+  return PLAYER_NAME_ZH[name] || "";
 }
 
 function heightToCm(height) {
@@ -369,6 +402,7 @@ async function enrichPlayers(players) {
   });
   return players.map((player, index) => ({
     ...player,
+    nameZh: translatePlayerName(player.name),
     positionZh: translatePosition(player.position),
     heightCm: heightToCm(player.height),
     weightKg: weightToKg(player.weight),
@@ -517,24 +551,27 @@ function buildEvaluationPrompt(analysisInput, config) {
 async function evaluateWithModel(match, config) {
   const analysisInput = await buildAnalysisInput(match);
   const prompt = buildEvaluationPrompt(analysisInput, config);
-  if (!process.env.LLM_API_URL || !process.env.LLM_API_KEY || !process.env.LLM_MODEL) {
+  const llmApiUrl = config.model?.apiUrl || process.env.LLM_API_URL;
+  const llmApiKey = config.model?.apiKey || process.env.LLM_API_KEY;
+  const llmModel = config.model?.model || process.env.LLM_MODEL;
+  if (!llmApiUrl || !llmApiKey || !llmModel) {
     return {
       ok: false,
       mode: "prompt-only",
-      warning: "未配置 LLM_API_URL / LLM_API_KEY / LLM_MODEL，已返回可直接发送给大模型的赛前分析输入包。",
+      warning: "未配置 API URL / API Key / 模型名，已返回可直接发送给大模型的赛前分析输入包。",
       analysisInput,
       prompt
     };
   }
 
-  const response = await fetch(process.env.LLM_API_URL, {
+  const response = await fetch(llmApiUrl, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${process.env.LLM_API_KEY}`
+      authorization: `Bearer ${llmApiKey}`
     },
     body: JSON.stringify({
-      model: process.env.LLM_MODEL,
+      model: llmModel,
       messages: [
         { role: "system", content: "你是严谨的足球赛前分析师。你分析比赛走势和过滤纪律，禁止承诺稳定盈利。" },
         { role: "user", content: prompt }
@@ -568,7 +605,7 @@ async function getTeamDetail(teamName) {
 
   if (isFresh(cacheFile, SQUAD_TTL_MS)) {
     const cached = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
-    const needsPlayerRefresh = cached.players?.some((player) => !player.heightCm || player.clubZh?.includes("待校验"));
+    const needsPlayerRefresh = cached.players?.some((player) => !player.heightCm || !player.nameZh || player.clubZh?.includes("待校验"));
     if (needsPlayerRefresh) {
       cached.players = await enrichPlayers(cached.players);
       cached.fetchedAt = new Date().toISOString();
@@ -705,6 +742,11 @@ async function handleApi(req, res, url) {
 
 function handleStatic(req, res, url) {
   const absolute = safeStaticPath(url.pathname);
+  if (absolute === MODEL_CONFIG) {
+    res.writeHead(403, { "content-type": "text/plain; charset=utf-8" });
+    res.end("Forbidden");
+    return;
+  }
   if (!absolute || !fs.existsSync(absolute) || fs.statSync(absolute).isDirectory()) {
     res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
     res.end("Not found");

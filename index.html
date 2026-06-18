@@ -18,66 +18,79 @@
           </div>
         </div>
 
-        <nav class="side-nav compact-nav" aria-label="主导航">
+        <nav class="side-nav" aria-label="主导航">
           <a class="active" href="index.html">比赛分析</a>
           <a href="config.html">模型配置</a>
           <a href="teams.html">球队资料</a>
+          <a href="skills.html">分析技能</a>
         </nav>
-
-        <div class="sync-panel">
-          <div>
-            <span class="muted-label">数据状态</span>
-            <strong>本地样本 · 可手动同步</strong>
-            <p class="sync-note">服务模式会轮询安全白名单数据源；当前尚未接入大模型自动分析。</p>
-          </div>
-          <div class="sync-actions">
-            <button data-sync-mode="selected" type="button" title="同步当前日期范围内的世界杯比赛">同步赛程</button>
-          </div>
-        </div>
-
-        <div class="date-panel">
-          <div class="date-range-fields">
-            <label>
-              <span class="muted-label">开始日期</span>
-              <input id="dateStart" type="date" value="2026-06-17" />
-            </label>
-            <label>
-              <span class="muted-label">结束日期</span>
-              <input id="dateEnd" type="date" value="2026-06-17" />
-            </label>
-          </div>
-          <button id="applyDate" type="button">确定</button>
-          <label>
-            <span class="muted-label">排序</span>
-            <select id="sortMode">
-              <option value="score-desc">可分析度从高到低</option>
-              <option value="date-asc">比赛日期从近到远</option>
-              <option value="date-desc">比赛日期从远到近</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="filter-tabs" role="tablist" aria-label="比赛筛选">
-          <button class="active" data-filter="all" type="button">全部</button>
-          <button data-filter="actionable" type="button">推荐关注</button>
-          <button data-filter="watch" type="button">谨慎观察</button>
-          <button data-filter="avoid" type="button">建议跳过</button>
-          <button data-filter="synced" type="button">待补资料</button>
-          <button data-filter="review" type="button">已赛复盘</button>
-        </div>
-
-        <section class="ranking-panel">
-          <div class="ranking-head">
-            <span class="muted-label">当前日期范围 · 未赛排行</span>
-            <strong id="rankingCount">0场</strong>
-          </div>
-          <div id="rankingList" class="ranking-list"></div>
-        </section>
-
-        <div class="match-list" id="matchList" aria-label="比赛列表"></div>
       </aside>
 
       <main class="main-panel">
+        <section class="control-section">
+          <div class="sync-panel">
+            <div>
+              <span class="muted-label">数据状态</span>
+              <strong>本地样本 · 可手动同步</strong>
+              <p class="sync-note">服务模式会轮询白名单数据源；点击同步会按当前日期范围拉取最新赛程。</p>
+            </div>
+            <div class="sync-actions">
+              <button data-sync-mode="selected" type="button" title="同步当前日期范围内的世界杯比赛">同步赛程</button>
+            </div>
+          </div>
+
+          <div class="date-panel">
+            <div class="date-range-fields">
+              <label>
+                <span class="muted-label">开始日期</span>
+                <input id="dateStart" type="date" value="2026-06-17" />
+              </label>
+              <label>
+                <span class="muted-label">结束日期</span>
+                <input id="dateEnd" type="date" value="2026-06-17" />
+              </label>
+            </div>
+            <button id="applyDate" type="button">确定</button>
+            <label>
+              <span class="muted-label">排序</span>
+              <select id="sortMode">
+                <option value="score-desc">可分析度从高到低</option>
+                <option value="date-asc">比赛日期从近到远</option>
+                <option value="date-desc">比赛日期从远到近</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="filter-tabs" role="tablist" aria-label="比赛筛选">
+            <button class="active" data-filter="all" type="button">全部</button>
+            <button data-filter="actionable" type="button">推荐关注</button>
+            <button data-filter="watch" type="button">谨慎观察</button>
+            <button data-filter="avoid" type="button">建议跳过</button>
+            <button data-filter="synced" type="button">待补资料</button>
+            <button data-filter="review" type="button">已赛复盘</button>
+          </div>
+        </section>
+
+        <section class="match-browser">
+          <section class="ranking-panel">
+            <div class="ranking-head">
+              <span class="muted-label">当前日期范围 · 未赛排行</span>
+              <strong id="rankingCount">0场</strong>
+            </div>
+            <div id="rankingList" class="ranking-list"></div>
+          </section>
+
+          <section class="match-list-panel">
+            <div class="section-head compact">
+              <div>
+                <span class="muted-label">比赛列表</span>
+                <h2>按当前筛选显示</h2>
+              </div>
+            </div>
+            <div class="match-list" id="matchList" aria-label="比赛列表"></div>
+          </section>
+        </section>
+
         <section class="match-hero" id="matchHero"></section>
 
         <section class="module-grid" id="moduleGrid"></section>
@@ -119,15 +132,15 @@
         <section class="model-section">
           <div class="section-head">
             <div>
-              <span class="muted-label">模型版本 v0.2</span>
-              <h2>因子权重试验台</h2>
+              <span class="muted-label">模型版本 v0.3</span>
+              <h2>大模型赛前分析</h2>
             </div>
-            <p>这里不是正式模型训练，只用于观察不同因子升权或降权后，“可分析度”如何变化。</p>
+            <p>模型会读取配置页里的 Key、URL、模型名、权重和输入项，并把当前比赛及双方球队资料打包分析。</p>
           </div>
           <div class="llm-panel">
             <div>
-              <strong>大模型赛前分析</strong>
-              <p>把当前比赛、球队资料、球员资料、配置权重和分析技能输入模型，生成上半场与全场走势判断。</p>
+              <strong>生成赛前分析</strong>
+              <p>输入当前比赛、球队资料、球员资料、配置权重和分析技能，输出上半场与全场走势判断。</p>
             </div>
             <button id="llmEvaluate" type="button">生成赛前分析</button>
           </div>

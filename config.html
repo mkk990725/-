@@ -21,7 +21,7 @@
           <a href="index.html">比赛分析</a>
           <a class="active" href="config.html">模型配置</a>
           <a href="teams.html">球队资料</a>
-          <a href="agent-skills/prematch-analysis.md" target="_blank" rel="noreferrer">分析技能</a>
+          <a href="skills.html">分析技能</a>
         </nav>
       </aside>
       <main class="config-main">
@@ -38,6 +38,14 @@
           <article class="config-card">
             <h2>模型配置</h2>
             <label>
+              <span class="muted-label">API URL</span>
+              <input id="apiUrl" type="text" placeholder="例如 https://api.openai.com/v1/chat/completions" />
+            </label>
+            <label>
+              <span class="muted-label">API Key</span>
+              <input id="apiKey" type="password" placeholder="临时保存在本地 model-config.json" />
+            </label>
+            <label>
               <span class="muted-label">模型名称</span>
               <input id="modelName" type="text" />
             </label>
@@ -45,7 +53,7 @@
               <span class="muted-label">温度</span>
               <input id="temperature" type="number" min="0" max="1" step="0.05" />
             </label>
-            <p class="config-note">实际请求地址和密钥通过服务环境变量配置：LLM_API_URL、LLM_API_KEY、LLM_MODEL。</p>
+            <p class="config-note">当前阶段先保存在本地配置文件，后续再改成后端安全密钥管理。</p>
           </article>
 
           <article class="config-card">

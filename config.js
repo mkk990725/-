@@ -22,7 +22,7 @@ const inputLabels = {
 };
 
 const defaultConfig = {
-  model: { model: "", temperature: 0.2 },
+  model: { apiUrl: "", apiKey: "", model: "", temperature: 0.2 },
   weights: {
     strength: 1.25,
     coach: 1.35,
@@ -66,6 +66,8 @@ async function saveConfig(config) {
 }
 
 function renderConfig() {
+  document.getElementById("apiUrl").value = currentConfig.model?.apiUrl || "";
+  document.getElementById("apiKey").value = currentConfig.model?.apiKey || "";
   document.getElementById("modelName").value = currentConfig.model?.model || "";
   document.getElementById("temperature").value = currentConfig.model?.temperature ?? 0.2;
   document.getElementById("disciplineText").value = (currentConfig.discipline || []).join("\n");
@@ -110,6 +112,8 @@ function collectConfig() {
     ...currentConfig,
     model: {
       ...(currentConfig.model || {}),
+      apiUrl: document.getElementById("apiUrl").value.trim(),
+      apiKey: document.getElementById("apiKey").value.trim(),
       model: document.getElementById("modelName").value.trim(),
       temperature: Number(document.getElementById("temperature").value)
     },
