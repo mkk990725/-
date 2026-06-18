@@ -532,6 +532,113 @@ h1 {
   font: 13px/1.55 "Consolas", "Microsoft YaHei", monospace;
 }
 
+.prediction-output {
+  display: block;
+  white-space: normal;
+}
+
+.prediction-output pre {
+  max-height: 520px;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7fafb;
+  white-space: pre-wrap;
+  font: 13px/1.55 "Consolas", "Microsoft YaHei", monospace;
+}
+
+.progress-log {
+  display: grid;
+  gap: 8px;
+}
+
+.progress-log div {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfa;
+  color: var(--subtle);
+}
+
+.prediction-summary-grid,
+.entertainment-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.result-card,
+.mini-prediction-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.result-card.accent {
+  border-color: rgba(16, 112, 86, 0.35);
+  background: #f4fbf8;
+}
+
+.result-card span,
+.mini-prediction-card span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--subtle);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.result-card strong,
+.mini-prediction-card strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.result-card p,
+.mini-prediction-card p,
+.prediction-section p {
+  margin: 0;
+  color: var(--subtle);
+  line-height: 1.6;
+}
+
+.prediction-section {
+  padding: 14px;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.prediction-section h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.config-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.team-match-picker {
+  padding: 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+}
+
+.team-match-picker select {
+  width: 100%;
+}
+
 .review-card {
   padding: 14px;
   margin-bottom: 12px;

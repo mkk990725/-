@@ -9,6 +9,7 @@ const CACHE_DIR = path.join(__dirname, ".cache");
 const SCOREBOARD_DIR = path.join(CACHE_DIR, "scoreboard");
 const SQUAD_DIR = path.join(CACHE_DIR, "squads");
 const PLAYER_DIR = path.join(CACHE_DIR, "players");
+const TRANSLATION_CACHE = path.join(CACHE_DIR, "player-name-translations.json");
 const TEAM_CACHE = path.join(CACHE_DIR, "teams.json");
 const MODEL_CONFIG = path.join(__dirname, "model-config.json");
 const PREMATCH_SKILL = path.join(__dirname, "agent-skills", "prematch-analysis.md");
@@ -273,6 +274,60 @@ const CLUB_ZH = {
 };
 
 const PLAYER_NAME_ZH = {
+  "Unai Simón": "乌奈·西蒙",
+  "David Raya": "大卫·拉亚",
+  "Álex Remiro": "亚历克斯·雷米罗",
+  "Joan García": "霍安·加西亚",
+  "Dani Carvajal": "达尼·卡瓦哈尔",
+  "Pedro Porro": "佩德罗·波罗",
+  "Marc Pubill": "马克·普比尔",
+  "Aymeric Laporte": "埃梅里克·拉波尔特",
+  "Eric García": "埃里克·加西亚",
+  "Robin Le Normand": "罗宾·勒诺尔芒",
+  "Nacho": "纳乔",
+  "Pau Cubarsí": "保·库巴西",
+  "Alejandro Grimaldo": "亚历杭德罗·格里马尔多",
+  "Marc Cucurella": "马克·库库雷利亚",
+  "Rodri": "罗德里",
+  "Martín Zubimendi": "马丁·苏维门迪",
+  "Fabián Ruiz": "法比安·鲁伊斯",
+  "Pedri": "佩德里",
+  "Mikel Merino": "米克尔·梅里诺",
+  "Marcos Llorente": "马科斯·略伦特",
+  "Gavi": "加维",
+  "Álex Baena": "亚历克斯·巴埃纳",
+  "Dani Olmo": "达尼·奥尔莫",
+  "Lamine Yamal": "拉明·亚马尔",
+  "Nico Williams": "尼科·威廉姆斯",
+  "Ferran Torres": "费兰·托雷斯",
+  "Álvaro Morata": "阿尔瓦罗·莫拉塔",
+  "Mikel Oyarzabal": "米克尔·奥亚萨瓦尔",
+  "Joselu": "何塞卢",
+  "Ansu Fati": "安苏·法蒂",
+  "Yeremy Pino": "耶雷米·皮诺",
+  "Yéremy Pino": "耶雷米·皮诺",
+  "Víctor Muñoz": "维克托·穆尼奥斯",
+  "Borja Iglesias": "博尔哈·伊格莱西亚斯",
+  "Bryan Zaragoza": "布莱恩·萨拉戈萨",
+  "Vozinha": "沃齐尼亚",
+  "Bruno Varela": "布鲁诺·瓦雷拉",
+  "Dylan Silva": "迪伦·席尔瓦",
+  "Logan Costa": "洛根·科斯塔",
+  "Roberto Lopes": "罗伯托·洛佩斯",
+  "Steven Moreira": "史蒂文·莫雷拉",
+  "Diney": "迪内",
+  "João Paulo Fernandes": "若昂·保罗·费尔南德斯",
+  "Patrick Andrade": "帕特里克·安德拉德",
+  "Jamiro Monteiro": "贾米罗·蒙泰罗",
+  "Kevin Pina": "凯文·皮纳",
+  "Deroy Duarte": "德罗伊·杜阿尔特",
+  "Bebé": "贝贝",
+  "Ryan Mendes": "瑞安·门德斯",
+  "Garry Rodrigues": "加里·罗德里格斯",
+  "Jovane Cabral": "若瓦内·卡布拉尔",
+  "Dailon Livramento": "戴隆·利夫拉门托",
+  "Benchimol": "本希莫尔",
+  "Willy Semedo": "威利·塞梅多",
   "Diogo Costa": "迪奥戈·科斯塔",
   "José Sá": "若泽·萨",
   "Rui Silva": "鲁伊·席尔瓦",
@@ -316,6 +371,98 @@ function translateClub(club) {
 
 function translatePlayerName(name) {
   return PLAYER_NAME_ZH[name] || "";
+}
+
+function readTranslationCache() {
+  if (fs.existsSync(TRANSLATION_CACHE)) return JSON.parse(fs.readFileSync(TRANSLATION_CACHE, "utf8"));
+  return {};
+}
+
+function writeTranslationCache(cache) {
+  fs.writeFileSync(TRANSLATION_CACHE, JSON.stringify(cache, null, 2));
+  return cache;
+}
+
+function modelSettings(config) {
+  return {
+    apiUrl: config.model?.apiUrl || process.env.LLM_API_URL,
+    apiKey: config.model?.apiKey || process.env.LLM_API_KEY,
+    model: config.model?.model || process.env.LLM_MODEL,
+    temperature: Number(config.model?.temperature ?? 0.2)
+  };
+}
+
+function extractAssistantText(payload) {
+  return payload?.choices?.[0]?.message?.content
+    || payload?.choices?.[0]?.text
+    || payload?.output_text
+    || "";
+}
+
+function parseJsonObject(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]);
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function callChatCompletions(config, messages, temperature = config.model?.temperature ?? 0.2, timeoutMs = 30000) {
+  const settings = modelSettings(config);
+  if (!settings.apiUrl || !settings.apiKey || !settings.model) {
+    throw new Error("缺少 API URL / API Key / 模型名");
+  }
+  const response = await fetch(settings.apiUrl, {
+    method: "POST",
+    signal: AbortSignal.timeout(timeoutMs),
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${settings.apiKey}`
+    },
+    body: JSON.stringify({
+      model: settings.model,
+      messages,
+      temperature: Number(temperature)
+    })
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`LLM HTTP ${response.status}${body ? `: ${body.slice(0, 240)}` : ""}`);
+  }
+  return response.json();
+}
+
+async function translateMissingPlayerNames(names) {
+  const cache = readTranslationCache();
+  const missing = [...new Set(names.filter((name) => name && !PLAYER_NAME_ZH[name] && !cache[name]))];
+  if (!missing.length) return cache;
+  const config = readModelConfig();
+  const settings = modelSettings(config);
+  if (!settings.apiUrl || !settings.apiKey || !settings.model) return cache;
+  try {
+    const payload = await callChatCompletions(config, [
+      { role: "system", content: "你只负责把足球运动员英文/拉丁字母姓名翻译成中文常用译名。只输出 JSON 对象，不要解释。" },
+      { role: "user", content: `请把这些球员名翻译成中文常用译名，保持一一对应：${JSON.stringify(missing)}` }
+    ], 0, 10000);
+    const parsed = parseJsonObject(extractAssistantText(payload));
+    if (parsed && typeof parsed === "object") {
+      missing.forEach((name) => {
+        if (typeof parsed[name] === "string" && parsed[name].trim()) cache[name] = parsed[name].trim();
+      });
+      writeTranslationCache(cache);
+    }
+  } catch {
+    return cache;
+  }
+  return cache;
 }
 
 function heightToCm(height) {
@@ -395,6 +542,7 @@ async function mapLimit(items, limit, mapper) {
 }
 
 async function enrichPlayers(players) {
+  const translatedNames = await translateMissingPlayerNames(players.map((player) => player.name));
   const profiles = await mapLimit(players, 4, async (player) => {
     try {
       return await fetchPlayerProfile(player);
@@ -404,7 +552,7 @@ async function enrichPlayers(players) {
   });
   return players.map((player, index) => ({
     ...player,
-    nameZh: translatePlayerName(player.name),
+    nameZh: translatePlayerName(player.name) || translatedNames[player.name] || "",
     positionZh: translatePosition(player.position),
     heightCm: heightToCm(player.height),
     weightKg: weightToKg(player.weight),
@@ -586,10 +734,8 @@ function buildReviewPrompt({ match, prediction }, config) {
 async function evaluateWithModel(match, config) {
   const analysisInput = await buildAnalysisInput(match);
   const prompt = buildEvaluationPrompt(analysisInput, config);
-  const llmApiUrl = config.model?.apiUrl || process.env.LLM_API_URL;
-  const llmApiKey = config.model?.apiKey || process.env.LLM_API_KEY;
-  const llmModel = config.model?.model || process.env.LLM_MODEL;
-  if (!llmApiUrl || !llmApiKey || !llmModel) {
+  const settings = modelSettings(config);
+  if (!settings.apiUrl || !settings.apiKey || !settings.model) {
     return {
       ok: false,
       mode: "prompt-only",
@@ -599,35 +745,20 @@ async function evaluateWithModel(match, config) {
     };
   }
 
-  const response = await fetch(llmApiUrl, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${llmApiKey}`
-    },
-    body: JSON.stringify({
-      model: llmModel,
-      messages: [
-        { role: "system", content: "你是严谨的足球赛前分析师。你分析比赛走势和过滤纪律，禁止承诺稳定盈利。" },
-        { role: "user", content: prompt }
-      ],
-      temperature: Number(config.model?.temperature ?? 0.2)
-    })
-  });
-  if (!response.ok) throw new Error(`LLM HTTP ${response.status}`);
   return {
     ok: true,
     mode: "llm",
-    result: await response.json()
+    result: await callChatCompletions(config, [
+      { role: "system", content: "你是严谨的足球赛前分析师。你分析比赛走势和过滤纪律，禁止承诺稳定盈利。不要输出隐藏推理链，只输出结论、证据和不确定性。" },
+      { role: "user", content: prompt }
+    ], config.model?.temperature ?? 0.2, 60000)
   };
 }
 
 async function reviewPrediction(match, prediction, config) {
   const prompt = buildReviewPrompt({ match, prediction }, config);
-  const llmApiUrl = config.model?.apiUrl || process.env.LLM_API_URL;
-  const llmApiKey = config.model?.apiKey || process.env.LLM_API_KEY;
-  const llmModel = config.model?.model || process.env.LLM_MODEL;
-  if (!llmApiUrl || !llmApiKey || !llmModel) {
+  const settings = modelSettings(config);
+  if (!settings.apiUrl || !settings.apiKey || !settings.model) {
     return {
       ok: false,
       mode: "prompt-only",
@@ -635,26 +766,27 @@ async function reviewPrediction(match, prediction, config) {
       prompt
     };
   }
-  const response = await fetch(llmApiUrl, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${llmApiKey}`
-    },
-    body: JSON.stringify({
-      model: llmModel,
-      messages: [
-        { role: "system", content: "你是严谨的足球赛后复盘分析师。你要找出预测失败原因，并改进下一次输入和技能。" },
-        { role: "user", content: prompt }
-      ],
-      temperature: Number(config.model?.temperature ?? 0.2)
-    })
-  });
-  if (!response.ok) throw new Error(`LLM HTTP ${response.status}`);
   return {
     ok: true,
     mode: "llm",
-    result: await response.json()
+    result: await callChatCompletions(config, [
+      { role: "system", content: "你是严谨的足球赛后复盘分析师。你要找出预测失败原因，并改进下一次输入和技能。" },
+      { role: "user", content: prompt }
+    ], config.model?.temperature ?? 0.2, 60000)
+  };
+}
+
+async function testModelConnection(config) {
+  const startedAt = Date.now();
+  const payload = await callChatCompletions(config, [
+    { role: "system", content: "你是模型连通性测试助手。只回复 JSON。" },
+    { role: "user", content: "请回复 {\"ok\":true,\"message\":\"pong\"}" }
+  ], 0, 30000);
+  return {
+    ok: true,
+    model: modelSettings(config).model,
+    elapsedMs: Date.now() - startedAt,
+    responsePreview: extractAssistantText(payload).slice(0, 200)
   };
 }
 
@@ -822,6 +954,12 @@ async function handleApi(req, res, url) {
   if (url.pathname === "/api/model-config") {
     if (req.method === "GET") return jsonResponse(res, 200, readModelConfig());
     if (req.method === "POST") return jsonResponse(res, 200, writeModelConfig(await readRequestBody(req)));
+  }
+
+  if (url.pathname === "/api/test-model") {
+    if (req.method !== "POST") return jsonResponse(res, 405, { error: "POST required" });
+    const body = await readRequestBody(req);
+    return jsonResponse(res, 200, await testModelConnection(body.config || readModelConfig()));
   }
 
   if (url.pathname === "/api/model-evaluate") {

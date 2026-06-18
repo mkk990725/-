@@ -24,6 +24,7 @@ const inputLabels = {
 
 const defaultConfig = {
   model: { apiUrl: "", apiKey: "", model: "", temperature: 0.2 },
+  profiles: [],
   weights: {
     strength: 1.25,
     coach: 1.35,
@@ -66,12 +67,30 @@ async function saveConfig(config) {
   return response.json();
 }
 
+async function testModel(config) {
+  const response = await fetch("/api/test-model", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ config })
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+  return payload;
+}
+
 function renderConfig() {
   document.getElementById("apiUrl").value = currentConfig.model?.apiUrl || "";
   document.getElementById("apiKey").value = currentConfig.model?.apiKey || "";
   document.getElementById("modelName").value = currentConfig.model?.model || "";
   document.getElementById("temperature").value = currentConfig.model?.temperature ?? 0.2;
+  document.getElementById("profileName").value = currentConfig.model?.profileName || "";
   document.getElementById("disciplineText").value = (currentConfig.discipline || []).join("\n");
+
+  const profiles = currentConfig.profiles || [];
+  document.getElementById("profileSelect").innerHTML = profiles.length
+    ? profiles.map((profile, index) => `<option value="${index}">${escapeHtml(profile.name || `配置 ${index + 1}`)} · ${escapeHtml(profile.model?.model || "未命名模型")}</option>`).join("")
+    : `<option value="">暂无配置组</option>`;
+  document.getElementById("applyProfile").disabled = !profiles.length;
 
   document.getElementById("configWeights").innerHTML = Object.entries(currentConfig.weights || {})
     .map(([key, value]) => `
@@ -124,6 +143,17 @@ function collectConfig() {
   };
 }
 
+function collectModelFromForm() {
+  return {
+    ...(currentConfig.model || {}),
+    apiUrl: document.getElementById("apiUrl").value.trim(),
+    apiKey: document.getElementById("apiKey").value.trim(),
+    model: document.getElementById("modelName").value.trim(),
+    temperature: Number(document.getElementById("temperature").value),
+    profileName: document.getElementById("profileName").value.trim()
+  };
+}
+
 document.getElementById("saveConfig").addEventListener("click", async () => {
   const status = document.getElementById("configStatus");
   try {
@@ -132,6 +162,48 @@ document.getElementById("saveConfig").addEventListener("click", async () => {
     renderConfig();
   } catch (error) {
     status.textContent = `保存失败：${error.message}`;
+  }
+});
+
+document.getElementById("saveProfile").addEventListener("click", async () => {
+  const status = document.getElementById("configStatus");
+  try {
+    const model = collectModelFromForm();
+    const name = model.profileName || model.model || `配置 ${(currentConfig.profiles || []).length + 1}`;
+    const profile = { name, model: { ...model, profileName: name }, savedAt: new Date().toISOString() };
+    const profiles = [...(currentConfig.profiles || [])];
+    const existingIndex = profiles.findIndex((item) => item.name === name);
+    if (existingIndex >= 0) profiles[existingIndex] = profile;
+    else profiles.push(profile);
+    currentConfig = await saveConfig({ ...collectConfig(), model: { ...model, profileName: name }, profiles });
+    status.textContent = `配置组已保存：${name}`;
+    renderConfig();
+  } catch (error) {
+    status.textContent = `保存配置组失败：${error.message}`;
+  }
+});
+
+document.getElementById("applyProfile").addEventListener("click", () => {
+  const profiles = currentConfig.profiles || [];
+  const profile = profiles[Number(document.getElementById("profileSelect").value)];
+  if (!profile) return;
+  currentConfig.model = { ...(profile.model || {}), profileName: profile.name };
+  renderConfig();
+  document.getElementById("configStatus").textContent = `已切换到配置组：${profile.name}`;
+});
+
+document.getElementById("testModel").addEventListener("click", async () => {
+  const status = document.getElementById("configStatus");
+  const button = document.getElementById("testModel");
+  button.disabled = true;
+  status.textContent = "正在测试模型联通...";
+  try {
+    const payload = await testModel({ ...currentConfig, model: collectModelFromForm() });
+    status.textContent = `联通成功：${payload.model || "模型已响应"}，耗时 ${payload.elapsedMs} ms`;
+  } catch (error) {
+    status.textContent = `联通失败：${error.message}`;
+  } finally {
+    button.disabled = false;
   }
 });
 

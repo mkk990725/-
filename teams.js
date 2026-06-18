@@ -1,10 +1,35 @@
+const matchSelect = document.getElementById("teamMatchSelect");
+
 function getQuery(name) {
   return new URLSearchParams(window.location.search).get(name);
 }
 
+function todayIso() {
+  return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function defaultMatch() {
+  const matchId = getQuery("match") || localStorage.getItem("selectedMatchId");
+  const fromQuery = window.WORLD_CUP_FIXTURES.find((match) => match.id === matchId);
+  if (fromQuery) return fromQuery;
+  const today = todayIso();
+  return window.WORLD_CUP_FIXTURES
+    .filter((match) => match.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.kickoffTime || "").localeCompare(b.kickoffTime || ""))[0]
+    || window.WORLD_CUP_FIXTURES[0];
+}
+
 function getMatch() {
-  const matchId = getQuery("match");
-  return window.WORLD_CUP_FIXTURES.find((match) => match.id === matchId) || window.WORLD_CUP_FIXTURES[0];
+  return window.WORLD_CUP_FIXTURES.find((match) => match.id === matchSelect.value) || defaultMatch();
+}
+
+function renderMatchSelect(selectedId) {
+  const matches = [...window.WORLD_CUP_FIXTURES]
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.kickoffTime || "").localeCompare(b.kickoffTime || ""));
+  matchSelect.innerHTML = matches
+    .map((match) => `<option value="${escapeHtml(match.id)}">${escapeHtml(match.date)} · ${escapeHtml(match.home)} vs ${escapeHtml(match.away)}</option>`)
+    .join("");
+  matchSelect.value = selectedId;
 }
 
 function escapeHtml(value = "") {
@@ -51,7 +76,7 @@ function linkList(localProfile, remoteProfile) {
 
 function renderPlayerRows(players) {
   if (!players.length) {
-    return `<div class="empty-state">暂未抓取到球员名单。通常原因是：还没同步到该球队的 ESPN squad 链接，或目标页面结构发生变化。</div>`;
+    return `<div class="empty-state">暂未抓取到球员名单。通常原因是还没同步到该球队的 ESPN squad 链接，或目标页面结构发生变化。</div>`;
   }
 
   return `
@@ -75,7 +100,7 @@ function renderPlayerRows(players) {
               <td>${escapeHtml(player.jersey || "-")}</td>
               <td>
                 ${player.href ? `<a href="${escapeHtml(player.href)}" target="_blank" rel="noreferrer">${escapeHtml(player.nameZh || player.name)}</a>` : escapeHtml(player.nameZh || player.name)}
-                ${player.nameZh ? `<span class="player-original">${escapeHtml(player.name)}</span>` : ""}
+                <span class="player-original">${escapeHtml(player.name)}</span>
               </td>
               <td>${escapeHtml(player.positionZh || player.position || "-")}</td>
               <td>${escapeHtml(player.age || "-")}</td>
@@ -137,6 +162,8 @@ function renderTeamCard(team, detail) {
 
 async function renderDetail() {
   const match = getMatch();
+  localStorage.setItem("selectedMatchId", match.id);
+  if (matchSelect.value !== match.id) matchSelect.value = match.id;
   const hero = document.getElementById("detailHero");
   const grid = document.getElementById("teamDetailGrid");
   hero.innerHTML = `
@@ -165,4 +192,7 @@ async function renderDetail() {
   grid.innerHTML = teams.map((team, index) => renderTeamCard(team, details[index])).join("");
 }
 
+const initial = defaultMatch();
+renderMatchSelect(initial.id);
+matchSelect.addEventListener("change", renderDetail);
 renderDetail();

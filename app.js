@@ -383,7 +383,8 @@ function makeSyncedMatch(event) {
 }
 
 function matchKey(match) {
-  return `${match.date}|${match.home}|${match.away}`;
+  const teams = [match.home, match.away].map((team) => String(team || "").trim()).sort((a, b) => a.localeCompare(b, "zh-CN"));
+  return `${match.date}|${teams[0]}|${teams[1]}`;
 }
 
 function mergeMatch(existing, incoming) {
@@ -556,8 +557,10 @@ function renderFactors(match) {
 }
 
 function render() {
+  dedupeMatchesByKey();
   ensureUsableFilter();
   const match = getSelectedMatch();
+  localStorage.setItem("selectedMatchId", match.id);
   renderMatchList();
   renderHero(match);
   renderVerdicts(match);

@@ -93,7 +93,8 @@ function beijingTimeFromIso(isoDateTime) {
 }
 
 function matchKey(match) {
-  return `${match.date}|${match.home}|${match.away}`;
+  const teams = [match.home, match.away].map((team) => String(team || "").trim()).sort((a, b) => a.localeCompare(b, "zh-CN"));
+  return `${match.date}|${teams[0]}|${teams[1]}`;
 }
 
 function statusPriority(match) {
@@ -134,8 +135,8 @@ function makeSyncedMatch(event) {
 }
 
 function mergeMatches(matches) {
-  const merged = new Map(window.WORLD_CUP_FIXTURES.map((match) => [matchKey(match), match]));
-  matches.forEach((incoming) => {
+  const merged = new Map();
+  [...window.WORLD_CUP_FIXTURES, ...matches].forEach((incoming) => {
     const key = matchKey(incoming);
     const existing = merged.get(key);
     if (!existing || statusPriority(incoming) > statusPriority(existing)) {
@@ -177,6 +178,7 @@ async function syncSelectedDate() {
 }
 
 function matchesForDate(date) {
+  mergeMatches([]);
   return window.WORLD_CUP_FIXTURES
     .filter((match) => match.date === date)
     .sort((a, b) => (a.kickoffTime || "").localeCompare(b.kickoffTime || "") || a.home.localeCompare(b.home, "zh-CN"));
@@ -191,7 +193,142 @@ function renderMatchOptions() {
 }
 
 function selectedMatch() {
-  return window.WORLD_CUP_FIXTURES.find((match) => match.id === predictMatch.value);
+  const match = window.WORLD_CUP_FIXTURES.find((item) => item.id === predictMatch.value);
+  if (match) localStorage.setItem("selectedMatchId", match.id);
+  return match;
+}
+
+function setProgress(lines) {
+  predictResult.innerHTML = `
+    <div class="progress-log">
+      ${lines.map((line) => `<div>${escapeHtml(line)}</div>`).join("")}
+    </div>
+  `;
+}
+
+function appendProgress(lines, line) {
+  lines.push(line);
+  setProgress(lines);
+}
+
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function assistantText(payload) {
+  const result = payload?.saved?.result || payload?.result || payload;
+  return result?.choices?.[0]?.message?.content
+    || result?.choices?.[0]?.text
+    || result?.output_text
+    || "";
+}
+
+function parsePredictionObject(payload) {
+  if (payload?.mode === "prompt-only") return null;
+  const text = assistantText(payload);
+  if (!text) return payload?.saved || payload?.result || payload;
+  try {
+    return JSON.parse(text);
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return { rawText: text };
+    try {
+      return JSON.parse(match[0]);
+    } catch {
+      return { rawText: text };
+    }
+  }
+}
+
+function valueText(value, fallback = "待模型给出") {
+  if (value === null || value === undefined || value === "") return fallback;
+  if (Array.isArray(value)) return value.map((item) => typeof item === "object" ? JSON.stringify(item) : item).join("；");
+  if (typeof value === "object") return value.summary || value.text || value.result || JSON.stringify(value);
+  return String(value);
+}
+
+function confidenceText(prediction) {
+  return valueText(
+    prediction.confidence
+      || prediction.confidence_score
+      || prediction.source_reliability?.confidence
+      || prediction.uncertainty?.confidence,
+    "模型未给出明确信心程度"
+  );
+}
+
+function renderTop3(items) {
+  const list = Array.isArray(items) ? items.slice(0, 3) : [];
+  if (!list.length) return `<div class="empty-state">模型没有给出娱乐比分前三项。</div>`;
+  return `
+    <div class="entertainment-grid">
+      ${list.map((item, index) => `
+        <div class="mini-prediction-card">
+          <span>娱乐 ${index + 1}</span>
+          <strong>${escapeHtml(valueText(item.score || item.scoreline || item.result, "-"))}</strong>
+          <p>${escapeHtml(valueText(item.half_full || item.halfFull || item.ht_ft, "半全场未给出"))}</p>
+          <p>${escapeHtml(valueText(item.reason || item.note || item.confidence, ""))}</p>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderPrediction(payload) {
+  if (payload.mode === "prompt-only") {
+    predictResult.innerHTML = `
+      <div class="info-warning">${escapeHtml(payload.warning)}</div>
+      <pre>${escapeHtml(payload.prompt)}</pre>
+    `;
+    return;
+  }
+  const prediction = parsePredictionObject(payload);
+  if (prediction?.rawText) {
+    predictResult.innerHTML = `<pre>${escapeHtml(prediction.rawText)}</pre>`;
+    return;
+  }
+  const sourceCheck = prediction.source_check || prediction.sourceCheck || {};
+  const winner = prediction.winner || prediction.win_tendency || prediction.full_time?.winner || prediction.full_time?.tendency;
+  predictResult.innerHTML = `
+    <div class="prediction-summary-grid">
+      <article class="result-card accent">
+        <span>胜负倾向</span>
+        <strong>${escapeHtml(valueText(winner, "模型未给出明确胜负倾向"))}</strong>
+        <p>信心程度：${escapeHtml(confidenceText(prediction))}</p>
+      </article>
+      <article class="result-card">
+        <span>是否可分析</span>
+        <strong>${escapeHtml(prediction.is_analyzable === false ? "建议跳过" : "可分析 / 谨慎观察")}</strong>
+        <p>${escapeHtml(valueText(prediction.filter_reason, "模型未给出过滤理由"))}</p>
+      </article>
+      <article class="result-card">
+        <span>信息源校验</span>
+        <strong>${escapeHtml(valueText(sourceCheck.status || sourceCheck.result, "已纳入校验"))}</strong>
+        <p>${escapeHtml(valueText(sourceCheck.summary || prediction.source_reliability, "模型未给出来源摘要"))}</p>
+      </article>
+    </div>
+    <div class="prediction-section">
+      <h3>上半场可能走势</h3>
+      <p>${escapeHtml(valueText(prediction.first_half || prediction.firstHalf))}</p>
+    </div>
+    <div class="prediction-section">
+      <h3>全场可能走势</h3>
+      <p>${escapeHtml(valueText(prediction.full_time || prediction.fullTime))}</p>
+    </div>
+    <div class="prediction-section">
+      <h3>关键依据</h3>
+      <p>${escapeHtml(valueText(prediction.key_evidence || prediction.evidence))}</p>
+    </div>
+    <div class="prediction-section">
+      <h3>娱乐参考前三项</h3>
+      ${renderTop3(prediction.entertainment_top3 || prediction.entertainmentTop3)}
+    </div>
+  `;
 }
 
 async function refreshOptions() {
@@ -209,8 +346,12 @@ async function generatePrediction() {
   if (!match) return;
   runPrediction.disabled = true;
   runPrediction.textContent = "生成中";
-  predictResult.textContent = "正在整理比赛、球队、球员、信息源校验和分析技能输入...";
+  const progress = [];
+  appendProgress(progress, "1. 已锁定比赛，开始整理赛程与双方球队。");
   try {
+    appendProgress(progress, "2. 正在读取球队资料、球员名单、身高体重、俱乐部和已配置的信息源策略。");
+    appendProgress(progress, "3. 正在执行信息源充足性与真实性校验，并准备大模型输入。");
+    appendProgress(progress, "4. 正在调用大模型生成预测，请等待响应。");
     const response = await fetch("/api/predict", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -218,11 +359,10 @@ async function generatePrediction() {
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
-    predictResult.textContent = payload.mode === "prompt-only"
-      ? `${payload.warning}\n\n${payload.prompt}`
-      : JSON.stringify(payload.saved || payload.result, null, 2);
+    appendProgress(progress, "5. 模型响应已返回，正在解析为可读结果。");
+    renderPrediction(payload);
   } catch (error) {
-    predictResult.textContent = `预测失败：${error.message}`;
+    predictResult.innerHTML = `<div class="info-warning">预测失败：${escapeHtml(error.message)}</div>`;
   } finally {
     runPrediction.disabled = false;
     runPrediction.textContent = "生成预测";
@@ -230,6 +370,7 @@ async function generatePrediction() {
 }
 
 predictDate.addEventListener("change", refreshOptions);
+predictMatch.addEventListener("change", selectedMatch);
 runPrediction.addEventListener("click", generatePrediction);
 
 const matchId = getQuery("match");

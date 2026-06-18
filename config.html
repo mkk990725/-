@@ -39,6 +39,14 @@
           <article class="config-card">
             <h2>模型配置</h2>
             <label>
+              <span class="muted-label">已保存配置组</span>
+              <select id="profileSelect"></select>
+            </label>
+            <div class="config-actions">
+              <button id="applyProfile" type="button" class="secondary-action">切换配置</button>
+              <button id="testModel" type="button" class="secondary-action">测试联通</button>
+            </div>
+            <label>
               <span class="muted-label">API URL</span>
               <input id="apiUrl" type="text" placeholder="例如 https://api.openai.com/v1/chat/completions" />
             </label>
@@ -54,6 +62,11 @@
               <span class="muted-label">温度</span>
               <input id="temperature" type="number" min="0" max="1" step="0.05" />
             </label>
+            <label>
+              <span class="muted-label">配置组名称</span>
+              <input id="profileName" type="text" placeholder="例如 OpenAI 主模型 / 备用模型" />
+            </label>
+            <button id="saveProfile" type="button" class="primary-action">保存为配置组</button>
             <p class="config-note">当前阶段先保存在本地配置文件，后续再改成后端安全密钥管理。</p>
           </article>
 
