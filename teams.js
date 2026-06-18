@@ -7,59 +7,159 @@ function getMatch() {
   return window.WORLD_CUP_FIXTURES.find((match) => match.id === matchId) || window.WORLD_CUP_FIXTURES[0];
 }
 
-function profileFor(team) {
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function localProfileFor(team) {
   return window.TEAM_PROFILES?.[team] || {
     coach: "待核验",
-    summary: "该队还没有本地资料。下一步应从 FIFA、国家队官方、ESPN squad、FBref/Transfermarkt 补充主教练、球员年龄、身体条件、俱乐部和联赛等级。",
-    sourceTier: "事实层优先，社交媒体只作辅助。",
+    summary: "本地还没有完整球队资料。启动服务并同步赛程后，会优先从白名单数据源补球队链接与球员名单。",
+    sourceTier: "事实层优先，舆情层只做辅助。",
     links: []
   };
 }
 
-function renderDetail() {
+async function fetchTeamDetail(team) {
+  if (!window.location.protocol.startsWith("http")) {
+    return {
+      team,
+      profile: null,
+      players: [],
+      warning: "当前是直接打开静态文件，无法调用本地抓取服务。请通过 node server.js 启动后访问。"
+    };
+  }
+
+  const response = await fetch(`/api/team-detail?team=${encodeURIComponent(team)}`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+function linkList(localProfile, remoteProfile) {
+  const urls = [
+    ...(localProfile.links || []),
+    remoteProfile?.squadLink,
+    ...(remoteProfile?.officialLinks || []).map((item) => item.href)
+  ].filter(Boolean);
+  return [...new Set(urls)];
+}
+
+function renderPlayerRows(players) {
+  if (!players.length) {
+    return `<div class="empty-state">暂未抓取到球员名单。通常原因是：还没同步到该球队的 ESPN squad 链接，或目标页面结构发生变化。</div>`;
+  }
+
+  return `
+    <div class="player-table-wrap">
+      <table class="player-table">
+        <thead>
+          <tr>
+            <th>号码</th>
+            <th>球员</th>
+            <th>位置</th>
+            <th>年龄</th>
+            <th>身高</th>
+            <th>体重</th>
+            <th>国籍</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${players.map((player) => `
+            <tr>
+              <td>${escapeHtml(player.jersey || "-")}</td>
+              <td>
+                ${player.href ? `<a href="${escapeHtml(player.href)}" target="_blank" rel="noreferrer">${escapeHtml(player.name)}</a>` : escapeHtml(player.name)}
+              </td>
+              <td>${escapeHtml(player.position || "-")}</td>
+              <td>${escapeHtml(player.age || "-")}</td>
+              <td>${escapeHtml(player.height || "-")}</td>
+              <td>${escapeHtml(player.weight || "-")}</td>
+              <td>${escapeHtml(player.nationality || "-")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderTeamCard(team, detail) {
+  const localProfile = localProfileFor(team);
+  const remoteProfile = detail.profile;
+  const links = linkList(localProfile, remoteProfile);
+  const players = detail.players || [];
+  const coach = localProfile.coach || "待核验";
+  const sourceLinks = links.length
+    ? links.map((href, index) => `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">资料源 ${index + 1}</a>`).join("")
+    : "<span>暂无外部链接</span>";
+
+  return `
+    <article class="team-detail-card">
+      <div class="team-detail-head">
+        <div>
+          <span class="muted-label">国家队</span>
+          <h2>${escapeHtml(team)}</h2>
+        </div>
+        <span class="tag">${escapeHtml(coach)}</span>
+      </div>
+      <p>${escapeHtml(localProfile.summary || "暂无摘要。")}</p>
+      <div class="team-meta-grid">
+        <div>
+          <span class="muted-label">球员名单</span>
+          <strong>${players.length ? `${players.length} 人` : "待抓取"}</strong>
+        </div>
+        <div>
+          <span class="muted-label">服务端更新时间</span>
+          <strong>${detail.fetchedAt ? new Date(detail.fetchedAt).toLocaleString("zh-CN") : "暂无"}</strong>
+        </div>
+      </div>
+      ${detail.warning ? `<div class="info-warning">${escapeHtml(detail.warning)}</div>` : ""}
+      <div class="info-block">
+        <strong>球员信息</strong>
+        ${renderPlayerRows(players)}
+      </div>
+      <div class="info-block">
+        <strong>来源策略</strong>
+        <p>${escapeHtml(localProfile.sourceTier || "优先使用官方与结构化数据源。")}</p>
+        <div class="team-links">${sourceLinks}</div>
+      </div>
+    </article>
+  `;
+}
+
+async function renderDetail() {
   const match = getMatch();
   const hero = document.getElementById("detailHero");
   const grid = document.getElementById("teamDetailGrid");
   hero.innerHTML = `
-    <span class="tag">${match.date}</span>
-    <span class="tag dark">${match.group}</span>
-    <h1>${match.home} vs ${match.away}</h1>
-    <p>${match.headline}</p>
+    <span class="tag">${escapeHtml(match.date)}</span>
+    <span class="tag dark">${escapeHtml(match.group)}</span>
+    <h1>${escapeHtml(match.home)} vs ${escapeHtml(match.away)}</h1>
+    <p>${escapeHtml(match.headline)}</p>
   `;
 
-  grid.innerHTML = [match.home, match.away].map((team) => {
-    const profile = profileFor(team);
-    const links = profile.links?.length
-      ? profile.links.map((href, index) => `<a href="${href}" target="_blank" rel="noreferrer">资料源 ${index + 1}</a>`).join("")
-      : "<span>暂无链接</span>";
+  grid.innerHTML = `<div class="empty-state detail-loading">正在抓取双方球队与球员信息...</div>`;
 
-    return `
-      <article class="team-detail-card">
-        <div class="team-detail-head">
-          <div>
-            <span class="muted-label">国家队</span>
-            <h2>${team}</h2>
-          </div>
-          <span class="tag">${profile.coach}</span>
-        </div>
-        <p>${profile.summary}</p>
-        <div class="info-block">
-          <strong>后续需要抓取的字段</strong>
-          <ul>
-            <li>主教练：执教风格、常用阵型、类似比赛调整记录</li>
-            <li>球员：年龄、身高体重、惯用脚、效力俱乐部、联赛等级</li>
-            <li>阵容：预计首发、伤停、轮换、关键球员状态</li>
-            <li>战术：压迫高度、低位质量、定位球、转换速度</li>
-          </ul>
-        </div>
-        <div class="info-block">
-          <strong>来源策略</strong>
-          <p>${profile.sourceTier || "优先使用官方与结构化数据源。"}</p>
-        </div>
-        <div class="team-links">${links}</div>
-      </article>
-    `;
-  }).join("");
+  const teams = [match.home, match.away];
+  const details = await Promise.all(teams.map(async (team) => {
+    try {
+      return await fetchTeamDetail(team);
+    } catch (error) {
+      return {
+        team,
+        profile: null,
+        players: [],
+        warning: `服务端球队资料读取失败：${error.message}`
+      };
+    }
+  }));
+
+  grid.innerHTML = teams.map((team, index) => renderTeamCard(team, details[index])).join("");
 }
 
 renderDetail();

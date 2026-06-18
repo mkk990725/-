@@ -469,26 +469,26 @@ function renderModules(match) {
   const teamsHref = `teams.html?match=${encodeURIComponent(match.id)}`;
   const analysisScore = normalizedAnalysisScore(match);
   el.moduleGrid.innerHTML = `
-    <a class="module-card" href="#verdictGrid">
+    <a class="module-card" href="#matchJudgment" data-scroll-target="matchJudgment">
       <span>01</span>
       <strong>赛前判断</strong>
-      <p>建议方向、规避项和风险等级。</p>
+      <p>建议方向、规避项和风险等级。当前可分析度 ${analysisScore}。</p>
     </a>
-    <a class="module-card" href="#factorList">
+    <a class="module-card" href="#matchScript" data-scroll-target="matchScript">
       <span>02</span>
+      <strong>比赛剧本</strong>
+      <p>上半场开局、全场走势边界和关键情景。</p>
+    </a>
+    <a class="module-card" href="#factorSection" data-scroll-target="factorSection">
+      <span>03</span>
       <strong>判断依据</strong>
       <p>因子摘要和可展开来源要求。</p>
     </a>
     <a class="module-card accent" href="${teamsHref}">
-      <span>03</span>
+      <span>04</span>
       <strong>球队情报</strong>
       <p>${match.home} / ${match.away} 教练、阵容和球员资料入口。</p>
     </a>
-    <div class="module-card metric">
-      <span>04</span>
-      <strong>${analysisScore}</strong>
-      <p>当前可分析度，越高越适合继续深挖。</p>
-    </div>
   `;
 }
 
@@ -652,6 +652,15 @@ el.syncButtons.forEach((button) => {
   button.addEventListener("click", () => {
     syncScoreboard(button.dataset.syncMode);
   });
+});
+
+el.moduleGrid.addEventListener("click", (event) => {
+  const link = event.target.closest("[data-scroll-target]");
+  if (!link) return;
+  const target = document.getElementById(link.dataset.scrollTarget);
+  if (!target) return;
+  event.preventDefault();
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
 render();

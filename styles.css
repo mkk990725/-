@@ -38,7 +38,7 @@ button {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 360px 1fr;
+  grid-template-columns: 430px 1fr;
   height: 100vh;
   overflow: hidden;
 }
@@ -355,6 +355,9 @@ h1 {
 .ranking-list {
   display: grid;
   gap: 8px;
+  max-height: 230px;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .ranking-item {
@@ -491,6 +494,14 @@ h1 {
   background: #fff;
   text-decoration: none;
   transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.module-card:focus-visible,
+.back-link:focus-visible,
+.team-links a:focus-visible,
+.player-table a:focus-visible {
+  outline: 3px solid rgba(23, 77, 115, 0.34);
+  outline-offset: 2px;
 }
 
 .module-card:hover {
@@ -864,7 +875,7 @@ h1 {
 }
 
 .detail-page {
-  max-width: 1180px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 24px;
 }
@@ -936,7 +947,8 @@ h1 {
 }
 
 .team-detail-grid {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
 }
 
 .team-detail-head {
@@ -958,6 +970,89 @@ h1 {
 
 .info-block ul {
   padding-left: 18px;
+}
+
+.team-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.team-meta-grid > div,
+.info-warning {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7fafb;
+}
+
+.team-meta-grid strong {
+  display: block;
+  font-size: 15px;
+}
+
+.info-warning {
+  margin-top: 12px;
+  color: var(--red);
+  font-size: 13px;
+  line-height: 1.55;
+  background: #fff7f6;
+}
+
+.detail-loading {
+  grid-column: 1 / -1;
+}
+
+.player-table-wrap {
+  width: 100%;
+  max-height: 520px;
+  overflow: auto;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.player-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  background: #fff;
+  font-size: 13px;
+}
+
+.player-table th,
+.player-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.player-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--subtle);
+  background: #f7fafb;
+  font-weight: 800;
+}
+
+.player-table td:first-child,
+.player-table th:first-child {
+  width: 56px;
+  text-align: center;
+}
+
+.player-table a {
+  color: var(--blue);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.player-table a:hover {
+  text-decoration: underline;
 }
 
 .model-section {

@@ -7,7 +7,9 @@ const HOST = process.env.HOST || "127.0.0.1";
 const POLL_MINUTES = Number(process.env.POLL_MINUTES || 15);
 const CACHE_DIR = path.join(__dirname, ".cache");
 const SCOREBOARD_DIR = path.join(CACHE_DIR, "scoreboard");
+const SQUAD_DIR = path.join(CACHE_DIR, "squads");
 const TEAM_CACHE = path.join(CACHE_DIR, "teams.json");
+const SQUAD_TTL_MS = Number(process.env.SQUAD_TTL_HOURS || 12) * 60 * 60 * 1000;
 const STATIC_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -60,6 +62,7 @@ const TEAM_NAME_ZH = {
 
 function ensureDirs() {
   fs.mkdirSync(SCOREBOARD_DIR, { recursive: true });
+  fs.mkdirSync(SQUAD_DIR, { recursive: true });
 }
 
 function jsonResponse(res, status, data) {
@@ -145,6 +148,140 @@ function squadLink(team) {
   return team?.links?.find((link) => link.rel?.includes("squad"))?.href || "";
 }
 
+function squadCachePath(teamName) {
+  const safeName = encodeURIComponent(teamName).replace(/%/g, "_");
+  return path.join(SQUAD_DIR, `${safeName}.json`);
+}
+
+function isFresh(file, ttlMs) {
+  if (!fs.existsSync(file)) return false;
+  return Date.now() - fs.statSync(file).mtimeMs < ttlMs;
+}
+
+function isAllowedSquadUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    return url.hostname === "www.espn.com" && url.pathname.startsWith("/soccer/team/squad/");
+  } catch {
+    return false;
+  }
+}
+
+function decodeHtml(value = "") {
+  return value
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(Number.parseInt(num, 10)))
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .trim();
+}
+
+function stripTags(value = "") {
+  return decodeHtml(value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " "));
+}
+
+function parseSquadHtml(html) {
+  const rows = [...html.matchAll(/<tr[^>]*data-idx="[^"]*"[^>]*>([\s\S]*?)<\/tr>/g)];
+  const players = [];
+
+  for (const [, row] of rows) {
+    if (!row.includes('data-resource-id="AthleteName"')) continue;
+    const link = row.match(/data-resource-id="AthleteName"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
+    if (!link) continue;
+    const jersey = row.match(/class="pl2 roster-jersey">([\s\S]*?)<\/span>/);
+    const cells = [...row.matchAll(/<td[^>]*class="Table__TD"[^>]*>([\s\S]*?)<\/td>/g)].map((cell) => stripTags(cell[1]));
+    const position = cells[1] || "";
+    const age = cells[2] || "";
+    const height = cells[3] || "";
+    const weight = cells[4] || "";
+    const nationality = cells[5] || "";
+
+    players.push({
+      name: stripTags(link[2]),
+      href: decodeHtml(link[1]),
+      jersey: jersey ? stripTags(jersey[1]) : "",
+      position,
+      age,
+      height,
+      weight,
+      nationality
+    });
+  }
+
+  return players;
+}
+
+async function fetchSquad(team) {
+  const link = team?.squadLink;
+  if (!link || !isAllowedSquadUrl(link)) {
+    return {
+      players: [],
+      source: link || "",
+      warning: "该球队暂未从赛程数据中发现可用的 ESPN squad 链接。"
+    };
+  }
+
+  const response = await fetch(link, {
+    headers: { "user-agent": "football-analysis-agent/0.1" }
+  });
+  if (!response.ok) throw new Error(`ESPN squad HTTP ${response.status}`);
+  const html = await response.text();
+  const players = parseSquadHtml(html);
+  return {
+    players,
+    source: link,
+    warning: players.length ? "" : "已访问 squad 页面，但没有解析到球员表。"
+  };
+}
+
+async function getTeamDetail(teamName) {
+  const teams = fs.existsSync(TEAM_CACHE) ? JSON.parse(fs.readFileSync(TEAM_CACHE, "utf8")) : {};
+  const team = teams[teamName];
+  const cacheFile = squadCachePath(teamName);
+
+  if (!team) {
+    return {
+      team: teamName,
+      profile: null,
+      players: [],
+      fetchedAt: "",
+      source: "",
+      warning: "本地球队缓存中还没有该队。请先同步包含这支球队的赛程。"
+    };
+  }
+
+  if (isFresh(cacheFile, SQUAD_TTL_MS)) {
+    return JSON.parse(fs.readFileSync(cacheFile, "utf8"));
+  }
+
+  try {
+    const squad = await fetchSquad(team);
+    const payload = {
+      team: teamName,
+      profile: team,
+      players: squad.players,
+      fetchedAt: new Date().toISOString(),
+      source: squad.source,
+      warning: squad.warning || ""
+    };
+    fs.writeFileSync(cacheFile, JSON.stringify(payload, null, 2));
+    return payload;
+  } catch (error) {
+    if (fs.existsSync(cacheFile)) return JSON.parse(fs.readFileSync(cacheFile, "utf8"));
+    return {
+      team: teamName,
+      profile: team,
+      players: [],
+      fetchedAt: "",
+      source: team.squadLink || "",
+      warning: error.message
+    };
+  }
+}
+
 function updateTeamCache(payload) {
   const existing = fs.existsSync(TEAM_CACHE) ? JSON.parse(fs.readFileSync(TEAM_CACHE, "utf8")) : {};
   for (const event of payload.events || []) {
@@ -200,7 +337,7 @@ async function handleApi(req, res, url) {
       ok: true,
       pollMinutes: POLL_MINUTES,
       cacheDir: CACHE_DIR,
-      sources: ["ESPN scoreboard allowlist"],
+      sources: ["ESPN scoreboard allowlist", "ESPN squad allowlist"],
       note: "This service polls safe allowlisted data sources. It does not run a prediction model yet."
     });
   }
@@ -219,6 +356,12 @@ async function handleApi(req, res, url) {
       count: Object.keys(teams).length,
       teams
     });
+  }
+
+  if (url.pathname === "/api/team-detail") {
+    const team = url.searchParams.get("team");
+    if (!team) return jsonResponse(res, 400, { error: "Missing team=" });
+    return jsonResponse(res, 200, await getTeamDetail(team));
   }
 
   if (url.pathname === "/api/sync-now") {
