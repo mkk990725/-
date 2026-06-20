@@ -4,4 +4,6 @@ football-agent.db-shm
 football-agent.db-wal
 football-agent.db-journal
 node_modules/
+.npm-cache/
+dist/
 *.log
