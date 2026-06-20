@@ -453,6 +453,8 @@ function matchIdentity(match) {
 async function getMatchesForBeijingRange(start, end) {
   const keys = dateRangeKeys(addDays(start, -1), addDays(end, 1));
   const payloads = await Promise.all(keys.map(async (key) => {
+    const cached = getScoreboardCachedFirst(key);
+    if (cached) return cached;
     try {
       return await getScoreboard(key);
     } catch {
@@ -1154,9 +1156,14 @@ async function getTeamDetail(teamName) {
       || player.clubZh?.includes("待校验")
     ));
     if (needsPlayerRefresh) {
-      cached.players = await enrichPlayers(cached.players);
-      cached.fetchedAt = new Date().toISOString();
-      fs.writeFileSync(cacheFile, JSON.stringify(cached, null, 2));
+      enrichPlayers(cached.players).then((players) => {
+        cached.players = players;
+        cached.fetchedAt = new Date().toISOString();
+        fs.writeFileSync(cacheFile, JSON.stringify(cached, null, 2));
+        upsertTeamRecord(teamName, cached);
+      }).catch((error) => {
+        console.warn(`Background player refresh failed for ${teamName}: ${error.message}`);
+      });
     }
     return cached;
   }
@@ -1218,6 +1225,15 @@ async function getScoreboard(dateKey) {
     if (cached) return cached;
     throw error;
   }
+}
+
+function getScoreboardCachedFirst(dateKey) {
+  const cached = readCachedScoreboard(dateKey);
+  if (!cached) return null;
+  fetchScoreboard(dateKey).catch((error) => {
+    console.warn(`Background scoreboard refresh failed for ${dateKey}: ${error.message}`);
+  });
+  return cached;
 }
 
 async function pollWindow() {

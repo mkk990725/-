@@ -1,5 +1,7 @@
 const matchSelect = document.getElementById("teamMatchSelect");
 let allMatches = [];
+const MATCH_CACHE_KEY = "footballAgent.teams.matchesCache.v1";
+const TEAM_DETAIL_CACHE_KEY = "footballAgent.teamDetails.v1";
 
 function getQuery(name) {
   return new URLSearchParams(window.location.search).get(name);
@@ -39,8 +41,10 @@ function matchKey(match) {
 }
 
 async function loadAllMatches() {
+  const cached = readMatchCache();
+  if (cached.length) allMatches = cached;
   if (!window.location.protocol.startsWith("http")) {
-    allMatches = [...window.WORLD_CUP_FIXTURES];
+    if (!allMatches.length) allMatches = [...window.WORLD_CUP_FIXTURES];
     return;
   }
   try {
@@ -54,9 +58,45 @@ async function loadAllMatches() {
       if (!merged.has(key) || String(match.id).startsWith("espn-")) merged.set(key, match);
     });
     allMatches = [...merged.values()];
+    writeMatchCache(allMatches);
   } catch {
-    allMatches = [...window.WORLD_CUP_FIXTURES];
+    if (!allMatches.length) allMatches = [...window.WORLD_CUP_FIXTURES];
   }
+}
+
+function readMatchCache() {
+  try {
+    const cache = JSON.parse(localStorage.getItem(MATCH_CACHE_KEY) || "{}");
+    return Array.isArray(cache.matches) ? cache.matches : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeMatchCache(matches) {
+  try {
+    localStorage.setItem(MATCH_CACHE_KEY, JSON.stringify({
+      updatedAt: new Date().toISOString(),
+      matches
+    }));
+  } catch {}
+}
+
+function readTeamDetailCache(team) {
+  try {
+    const cache = JSON.parse(localStorage.getItem(TEAM_DETAIL_CACHE_KEY) || "{}");
+    return cache[team] || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeTeamDetailCache(team, detail) {
+  try {
+    const cache = JSON.parse(localStorage.getItem(TEAM_DETAIL_CACHE_KEY) || "{}");
+    cache[team] = { ...detail, cachedAt: new Date().toISOString() };
+    localStorage.setItem(TEAM_DETAIL_CACHE_KEY, JSON.stringify(cache));
+  } catch {}
 }
 
 function escapeHtml(value = "") {
@@ -89,7 +129,9 @@ async function fetchTeamDetail(team) {
 
   const response = await fetch(`/api/team-detail?team=${encodeURIComponent(team)}`);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
+  const detail = await response.json();
+  writeTeamDetailCache(team, detail);
+  return detail;
 }
 
 function linkList(localProfile, remoteProfile) {
@@ -200,9 +242,14 @@ async function renderDetail() {
     <p>${escapeHtml(match.headline)}</p>
   `;
 
-  grid.innerHTML = `<div class="empty-state detail-loading">正在抓取双方球队与球员信息...</div>`;
-
   const teams = [match.home, match.away];
+  const cachedDetails = teams.map(readTeamDetailCache);
+  if (cachedDetails.every(Boolean)) {
+    grid.innerHTML = teams.map((team, index) => renderTeamCard(team, cachedDetails[index])).join("");
+  } else {
+    grid.innerHTML = `<div class="empty-state detail-loading">正在读取球队资料缓存...</div>`;
+  }
+
   const details = await Promise.all(teams.map(async (team) => {
     try {
       return await fetchTeamDetail(team);
@@ -219,9 +266,17 @@ async function renderDetail() {
   grid.innerHTML = teams.map((team, index) => renderTeamCard(team, details[index])).join("");
 }
 
-matchSelect.addEventListener("change", renderDetail);
-loadAllMatches().then(() => {
+function renderInitialTeamPage() {
   const initial = defaultMatch();
   renderMatchSelect(initial.id);
   renderDetail();
-});
+}
+
+matchSelect.addEventListener("change", renderDetail);
+allMatches = readMatchCache();
+if (!allMatches.length) allMatches = [...window.WORLD_CUP_FIXTURES];
+renderInitialTeamPage();
+loadAllMatches().then(() => {
+  const current = getMatch();
+  renderMatchSelect(current.id);
+}).catch(() => {});

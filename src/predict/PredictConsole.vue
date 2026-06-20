@@ -280,13 +280,16 @@ function eventToMatch(event) {
 
 async function loadMatches() {
   if (!selectedDate.value) return;
+  const previousKey = selectedMatchKey.value;
   const response = await fetch(`/api/matches?start=${selectedDate.value}&end=${selectedDate.value}`);
   if (!response.ok) throw new Error(`赛程接口 HTTP ${response.status}`);
   const payload = await response.json();
   matches.value = (payload.matches || [])
     .map((match) => ({ ...match, key: match.key || matchKey(match) }))
     .sort((a, b) => a.kickoffTime.localeCompare(b.kickoffTime));
-  selectedMatchKey.value = matches.value[0]?.key || "";
+  selectedMatchKey.value = matches.value.some((match) => match.key === previousKey)
+    ? previousKey
+    : matches.value[0]?.key || "";
 }
 
 async function loadDataSources() {
@@ -378,6 +381,8 @@ function renderChart() {
 
 async function runTask() {
   if (!selectedMatch.value) return;
+  const taskMatchKey = selectedMatchKey.value;
+  const taskMatch = { ...selectedMatch.value };
   running.value = true;
   buttonText.value = "处理中...";
   completedSteps.value = 0;
@@ -390,6 +395,7 @@ async function runTask() {
     await sleep(1500);
     log("正在检索信息：ESPN 赛程、球队名单、已有预测库与信息源缺口...");
     await loadMatches();
+    selectedMatchKey.value = taskMatchKey;
     completedSteps.value = 2;
     await sleep(1500);
     log("正在推理分析：检查 xG、每脚射门平均 xG、首轮真实表现与战术证据是否缺失...");
@@ -399,7 +405,7 @@ async function runTask() {
     const response = await fetch("/api/predict", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ match: selectedMatch.value })
+      body: JSON.stringify({ match: taskMatch })
     });
     if (!response.ok) throw new Error(`预测接口 HTTP ${response.status}`);
     prediction.value = parsePrediction(await response.json());

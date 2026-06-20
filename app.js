@@ -1,4 +1,5 @@
 const INITIAL_DATE = currentBeijingIsoDate();
+const MATCH_CACHE_KEY = "footballAgent.matchesCache.v1";
 
 const state = {
   filter: "all",
@@ -460,6 +461,41 @@ function mergeSyncedMatches(events) {
   window.WORLD_CUP_FIXTURES.sort((a, b) => a.date.localeCompare(b.date) || a.home.localeCompare(b.home, "zh-CN"));
 }
 
+function mergeServerMatches(matches) {
+  const existingById = new Map(window.WORLD_CUP_FIXTURES.map((match) => [match.id, match]));
+  const existingByKey = new Map(window.WORLD_CUP_FIXTURES.map((match) => [matchKey(match), match]));
+  matches.forEach((match) => {
+    if (!match?.home || !match?.away) return;
+    if (existingById.has(match.id)) {
+      Object.assign(existingById.get(match.id), match);
+    } else if (existingByKey.has(matchKey(match))) {
+      mergeMatch(existingByKey.get(matchKey(match)), match);
+    } else {
+      window.WORLD_CUP_FIXTURES.push(match);
+    }
+  });
+  dedupeMatchesByKey();
+  window.WORLD_CUP_FIXTURES.sort((a, b) => a.date.localeCompare(b.date) || (a.kickoffTime || "").localeCompare(b.kickoffTime || ""));
+}
+
+function readMatchCache() {
+  try {
+    const cache = JSON.parse(localStorage.getItem(MATCH_CACHE_KEY) || "{}");
+    if (Array.isArray(cache.matches) && cache.matches.length) {
+      mergeServerMatches(cache.matches);
+    }
+  } catch {}
+}
+
+function writeMatchCache(matches) {
+  try {
+    localStorage.setItem(MATCH_CACHE_KEY, JSON.stringify({
+      updatedAt: new Date().toISOString(),
+      matches
+    }));
+  } catch {}
+}
+
 function uniqueEvents(events) {
   const seen = new Set();
   return events.filter((event) => {
@@ -707,6 +743,8 @@ el.predictionResult.addEventListener("click", async (event) => {
   }
 });
 
+readMatchCache();
+render();
 loadPredictions()
   .then(refreshScoreboards)
   .finally(render);
@@ -714,15 +752,6 @@ setInterval(() => {
   refreshScoreboards().catch(() => {});
   loadPredictions().then(render).catch(() => {});
 }, 30 * 1000);
-
-async function fetchScoreboard(dateKey) {
-  const endpoint = window.location.protocol.startsWith("http")
-    ? `/api/scoreboard?dates=${dateKey}`
-    : `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${dateKey}`;
-  const response = await fetch(endpoint);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
-}
 
 async function loadPredictions() {
   if (!window.location.protocol.startsWith("http")) return;
@@ -733,11 +762,10 @@ async function loadPredictions() {
 async function refreshScoreboards() {
   if (!window.location.protocol.startsWith("http")) return;
   const [start, end] = normalizeDateRange(state.dateStart || formatIsoDate(), state.dateEnd || state.dateStart || formatIsoDate());
-  const payloads = await Promise.all(syncDateRangeKeysForBeijing(start, end).map(fetchScoreboard));
-  const events = uniqueEvents(payloads.flatMap((payload) => payload.events || []))
-    .filter((event) => {
-      const eventDate = beijingDateFromIso(event.date);
-      return eventDate && eventDate >= start && eventDate <= end;
-    });
-  mergeSyncedMatches(events);
+  const response = await fetch(`/api/matches?start=${start}&end=${end}`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const payload = await response.json();
+  const matches = payload.matches || [];
+  mergeServerMatches(matches);
+  writeMatchCache(matches);
 }
