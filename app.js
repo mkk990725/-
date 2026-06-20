@@ -1,8 +1,10 @@
+const INITIAL_DATE = currentBeijingIsoDate();
+
 const state = {
   filter: "all",
-  selectedId: window.WORLD_CUP_FIXTURES[0].id,
-  dateStart: "2026-06-17",
-  dateEnd: "2026-06-17",
+  selectedId: initialSelectedMatchId(),
+  dateStart: INITIAL_DATE,
+  dateEnd: INITIAL_DATE,
   sortMode: "score-desc",
   predictions: {},
   reviews: {},
@@ -16,6 +18,17 @@ const state = {
     uncertainty: -1
   }
 };
+
+function currentBeijingIsoDate() {
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" });
+}
+
+function initialSelectedMatchId() {
+  const firstToday = window.WORLD_CUP_FIXTURES
+    .filter((match) => match.date === INITIAL_DATE)
+    .sort((a, b) => (a.kickoffTime || "").localeCompare(b.kickoffTime || ""))[0];
+  return (firstToday || window.WORLD_CUP_FIXTURES[0]).id;
+}
 
 const statusText = {
   actionable: "推荐关注",
@@ -628,6 +641,12 @@ function renderFactors(match) {
 function render() {
   dedupeMatchesByKey();
   ensureUsableFilter();
+  const visible = visibleMatches();
+  if (visible.length && !visible.some((item) => item.id === state.selectedId)) {
+    state.selectedId = visible[0].id;
+  }
+  el.dateStart.value = state.dateStart;
+  el.dateEnd.value = state.dateEnd;
   const match = getSelectedMatch();
   localStorage.setItem("selectedMatchId", match.id);
   renderMatchList();

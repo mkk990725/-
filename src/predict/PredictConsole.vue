@@ -56,19 +56,23 @@
               </n-grid>
 
               <div class="button-row">
-                <n-button
+                <button
                   id="startButton"
-                  type="info"
-                  size="large"
-                  :loading="running"
+                  type="button"
+                  class="primary-run-button"
                   :disabled="!selectedMatch || running"
                   @click="runTask"
                 >
                   {{ buttonText }}
-                </n-button>
-                <n-button secondary size="large" :disabled="!selectedMatch || running" @click="runCodexPackage">
+                </button>
+                <button
+                  type="button"
+                  class="codex-mini-button"
+                  :disabled="!selectedMatch || running"
+                  @click="runCodexPackage"
+                >
                   使用 Codex 大脑
-                </n-button>
+                </button>
               </div>
 
               <div class="stepper">
@@ -170,7 +174,7 @@ const teamNameZh = {
   "United States": "美国"
 };
 
-const selectedDate = ref("2026-06-18");
+const selectedDate = ref(currentBeijingIsoDate());
 const selectedMatchKey = ref("");
 const matches = ref([]);
 const logs = ref([]);
@@ -204,6 +208,10 @@ function zhTeam(name) {
 
 function timestamp() {
   return new Date().toLocaleTimeString("zh-CN", { hour12: false });
+}
+
+function currentBeijingIsoDate() {
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" });
 }
 
 function log(text) {
@@ -603,8 +611,51 @@ loadDataSources().catch(() => {});
 .button-row {
   display: flex;
   justify-content: center;
+  align-items: center;
   gap: 12px;
   margin: 24px 0;
+}
+
+.primary-run-button,
+.codex-mini-button {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, opacity 0.16s ease;
+}
+
+.primary-run-button {
+  min-width: 168px;
+  min-height: 46px;
+  padding: 0 26px;
+  color: #06111f;
+  border-color: rgba(125, 211, 252, 0.92);
+  background: linear-gradient(135deg, #38bdf8, #67e8f9);
+  box-shadow: 0 12px 30px rgba(56, 189, 248, 0.28);
+}
+
+.codex-mini-button {
+  min-height: 34px;
+  padding: 0 12px;
+  color: #bae6fd;
+  border-color: rgba(56, 189, 248, 0.34);
+  background: rgba(15, 23, 42, 0.68);
+  font-size: 12px;
+}
+
+.primary-run-button:hover:not(:disabled),
+.codex-mini-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(125, 211, 252, 0.96);
+}
+
+.primary-run-button:disabled,
+.codex-mini-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+  box-shadow: none;
 }
 
 .stepper {

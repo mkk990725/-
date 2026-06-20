@@ -1021,7 +1021,7 @@ function buildEvaluationPrompt(analysisInput, config) {
     "必须先做信息源充足性与真实性校验：区分官方事实、结构化数据、媒体报道、舆情线索、模型推断；识别未经交叉验证的伤停、首发、战术烟雾弹和市场噪声。信息源不足时必须降级或跳过。",
     "必须输出：1）是否可分析/是否建议跳过；2）信息源校验；3）上半场走势；4）全场走势边界；5）最关键证据；6）信息缺口；7）来源可靠性；8）不确定性；9）娱乐参考的前三个比分与半全场选项。",
     "如果信息源不足，必须明确列出缺哪些信息、去哪类来源补：The Guardian 比赛直播记录、The Analyst/Opta 赛前和数据分析文章、FIFA 官方技术统计、全场录像观察、官方首发/伤停/发布会。",
-    "分析球队整体时必须区分控球/推进/射门数量与稳定破门能力。优先检查 xG、每脚射门平均 xG、禁区触球、重大机会、定位球质量、PPDA、推进到三区次数。示例：如果球队首轮每脚射门平均 xG 只有 0.04，应警惕其进攻被射门数量高估。",
+    "分析球队整体时必须区分控球/推进/射门数量与稳定破门能力。优先寻找能表达真实表现质量的数据族，例如机会质量、射门位置与每脚射门质量、禁区触球、重大机会、定位球质量、压迫强度、推进到三区次数和防线承压。xG、每脚射门平均 xG 只是这类数据的例子，不是唯一指标。示例：如果球队首轮射门很多但每脚射门质量很低，应警惕其进攻被射门数量高估。",
     "不要承诺精确比分，不要承诺稳定盈利。娱乐比分和半全场只能标注为娱乐参考，不能作为投资建议。",
     "建议输出 JSON，字段至少包含 source_check、is_analyzable、filter_reason、first_half、full_time、key_evidence、information_gaps、source_reliability、uncertainty、team_data_check、entertainment_top3。",
     `分析技能：\n${skill}`,
@@ -1332,7 +1332,7 @@ async function handleApi(req, res, url) {
         "The Analyst / Opta 赛前与赛后数据文章",
         "FIFA 官方技术统计与 match report",
         "全场录像观察：高压触发点、出球路线、射门质量、换人后结构变化",
-        "小组赛第一轮真实事件数据：xG、每脚射门平均 xG、禁区触球、定位球、PPDA、推进到三区次数"
+        "小组赛第一轮真实表现质量数据：机会质量、射门位置与每脚射门质量、禁区触球、重大机会、定位球质量、压迫强度、推进到三区次数"
       ],
       prompt: buildEvaluationPrompt(analysisInput, readModelConfig()),
       analysisInput
