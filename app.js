@@ -175,7 +175,7 @@ function sortMatches(matches) {
 }
 
 function predictionFor(match) {
-  return state.predictions[match.id] || state.predictions[`${match.date}|${match.home}|${match.away}`];
+  return state.predictions[match.id] || state.predictions[matchKey(match)] || state.predictions[`${match.date}|${match.home}|${match.away}`];
 }
 
 function statusClass(match) {
@@ -542,10 +542,75 @@ function renderVerdicts(match) {
   ` : "";
   const reviewPanel = review ? `<pre>${JSON.stringify(review.result || review, null, 2)}</pre>` : "";
   const predictionPanel = prediction
-    ? `<pre>${JSON.stringify(prediction.result || prediction, null, 2)}</pre>`
+    ? renderPredictionSummary(prediction)
     : `<div class="empty-state">这场比赛还没有大模型预测结果。请进入预测模块生成。</div>`;
   el.predictionResult.innerHTML = `${actualPanel}${predictionPanel}${comparePanel}${reviewPanel}`;
   if (el.predictLink) el.predictLink.href = `predict.html?match=${encodeURIComponent(match.id)}`;
+}
+
+function valueText(value, fallback = "待模型给出") {
+  if (value === null || value === undefined || value === "") return fallback;
+  if (Array.isArray(value)) return value.map((item) => typeof item === "object" ? JSON.stringify(item) : item).join("；");
+  if (typeof value === "object") return value.summary || value.text || value.result || JSON.stringify(value);
+  return String(value);
+}
+
+function renderEntertainmentTop3(items) {
+  const list = Array.isArray(items) ? items.slice(0, 3) : [];
+  if (!list.length) return `<div class="empty-state">模型没有给出娱乐比分前三项。</div>`;
+  return `
+    <div class="entertainment-grid">
+      ${list.map((item, index) => `
+        <div class="mini-prediction-card">
+          <span>娱乐 ${index + 1}</span>
+          <strong>${valueText(item.score || item.scoreline || item.result, "-")}</strong>
+          <p>${valueText(item.half_full || item.halfFull || item.ht_ft, "半全场未给出")}</p>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderPredictionSummary(prediction) {
+  const summary = prediction.summary || prediction.result?.summary || prediction.result || prediction;
+  const sourceCheck = summary.source_check || summary.sourceCheck || {};
+  const winner = summary.winner || summary.win_tendency || summary.full_time?.winner || summary.full_time?.tendency;
+  const confidence = summary.confidence || summary.confidence_score || summary.source_reliability?.confidence || "模型未给出明确信心程度";
+  return `
+    <div class="prediction-summary-grid">
+      <article class="result-card accent">
+        <span>胜负倾向</span>
+        <strong>${valueText(winner, "模型未给出明确胜负倾向")}</strong>
+        <p>信心程度：${valueText(confidence)}</p>
+      </article>
+      <article class="result-card">
+        <span>是否可分析</span>
+        <strong>${summary.is_analyzable === false ? "建议跳过" : "可分析 / 谨慎观察"}</strong>
+        <p>${valueText(summary.filter_reason, "模型未给出过滤理由")}</p>
+      </article>
+      <article class="result-card">
+        <span>信息源校验</span>
+        <strong>${valueText(sourceCheck.status || sourceCheck.result, "已纳入校验")}</strong>
+        <p>${valueText(sourceCheck.summary || summary.source_reliability, "模型未给出来源摘要")}</p>
+      </article>
+    </div>
+    <div class="prediction-section">
+      <h3>上半场可能走势</h3>
+      <p>${valueText(summary.first_half || summary.firstHalf)}</p>
+    </div>
+    <div class="prediction-section">
+      <h3>全场可能走势</h3>
+      <p>${valueText(summary.full_time || summary.fullTime)}</p>
+    </div>
+    <div class="prediction-section">
+      <h3>关键依据</h3>
+      <p>${valueText(summary.key_evidence || summary.evidence)}</p>
+    </div>
+    <div class="prediction-section">
+      <h3>娱乐参考前三项</h3>
+      ${renderEntertainmentTop3(summary.entertainment_top3 || summary.entertainmentTop3)}
+    </div>
+  `;
 }
 
 function renderScripts(match) {

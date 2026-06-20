@@ -1,6 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const { DatabaseSync } = require("node:sqlite");
 
 const PORT = Number(process.env.PORT || 5174);
 const HOST = process.env.HOST || "127.0.0.1";
@@ -12,6 +13,8 @@ const PLAYER_DIR = path.join(CACHE_DIR, "players");
 const TRANSLATION_CACHE = path.join(CACHE_DIR, "player-name-translations.json");
 const TEAM_CACHE = path.join(CACHE_DIR, "teams.json");
 const MODEL_CONFIG = path.join(__dirname, "model-config.json");
+const MODEL_CONFIG_EXAMPLE = path.join(__dirname, "model-config.example.json");
+const DB_FILE = path.join(__dirname, "football-agent.db");
 const PREMATCH_SKILL = path.join(__dirname, "agent-skills", "prematch-analysis.md");
 const LEARNING_SKILL = path.join(__dirname, "agent-skills", "learning-failures.md");
 const PREDICTION_CACHE = path.join(CACHE_DIR, "predictions.json");
@@ -71,6 +74,169 @@ function ensureDirs() {
   fs.mkdirSync(SCOREBOARD_DIR, { recursive: true });
   fs.mkdirSync(SQUAD_DIR, { recursive: true });
   fs.mkdirSync(PLAYER_DIR, { recursive: true });
+}
+
+let db;
+
+function database() {
+  if (db) return db;
+  db = new DatabaseSync(DB_FILE);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS model_profiles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      provider TEXT,
+      api_url TEXT,
+      model TEXT,
+      temperature REAL,
+      output_language TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS teams (
+      team TEXT PRIMARY KEY,
+      payload_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS predictions (
+      prediction_key TEXT PRIMARY KEY,
+      match_id TEXT,
+      match_date TEXT,
+      home TEXT,
+      away TEXT,
+      model_name TEXT,
+      summary_json TEXT,
+      raw_json TEXT NOT NULL,
+      generated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS sync_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source TEXT NOT NULL,
+      status TEXT NOT NULL,
+      message TEXT,
+      created_at TEXT NOT NULL
+    );
+  `);
+  return db;
+}
+
+function writeSyncLog(source, status, message = "") {
+  database().prepare(`
+    INSERT INTO sync_log (source, status, message, created_at)
+    VALUES (?, ?, ?, ?)
+  `).run(source, status, message, new Date().toISOString());
+}
+
+function redactModel(model = {}) {
+  return {
+    provider: model.provider || "openai-compatible",
+    apiUrl: model.apiUrl || "",
+    apiKey: "",
+    model: model.model || "",
+    temperature: Number(model.temperature ?? 0.2),
+    outputLanguage: model.outputLanguage || "zh-CN",
+    profileName: model.profileName || ""
+  };
+}
+
+function upsertModelProfile(profile) {
+  const safeModel = redactModel(profile.model || profile);
+  const name = profile.name || safeModel.profileName || safeModel.model || "未命名模型";
+  const now = new Date().toISOString();
+  const existing = database().prepare("SELECT id FROM model_profiles WHERE name = ?").get(name);
+  if (existing) {
+    database().prepare(`
+      UPDATE model_profiles
+      SET provider = ?, api_url = ?, model = ?, temperature = ?, output_language = ?, updated_at = ?
+      WHERE name = ?
+    `).run(safeModel.provider, safeModel.apiUrl, safeModel.model, safeModel.temperature, safeModel.outputLanguage, now, name);
+  } else {
+    database().prepare(`
+      INSERT INTO model_profiles (name, provider, api_url, model, temperature, output_language, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(name, safeModel.provider, safeModel.apiUrl, safeModel.model, safeModel.temperature, safeModel.outputLanguage, now, now);
+  }
+}
+
+function syncModelProfilesToDb(config = readModelConfig()) {
+  (config.profiles || []).forEach(upsertModelProfile);
+  if (config.model?.model || config.model?.apiUrl) {
+    upsertModelProfile({ name: config.model.profileName || config.model.model || "当前模型", model: config.model });
+  }
+}
+
+function upsertTeamRecord(team, payload) {
+  database().prepare(`
+    INSERT INTO teams (team, payload_json, updated_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(team) DO UPDATE SET payload_json = excluded.payload_json, updated_at = excluded.updated_at
+  `).run(team, JSON.stringify(payload), new Date().toISOString());
+}
+
+function matchKeyForPrediction(match) {
+  const teams = [match?.home, match?.away].map((team) => String(team || "").trim()).sort((a, b) => a.localeCompare(b, "zh-CN"));
+  return `${match?.date || ""}|${teams[0] || ""}|${teams[1] || ""}`;
+}
+
+function extractAssistantText(payload) {
+  return payload?.choices?.[0]?.message?.content
+    || payload?.choices?.[0]?.text
+    || payload?.output_text
+    || "";
+}
+
+function parseJsonObject(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]);
+    } catch {
+      return null;
+    }
+  }
+}
+
+function summarizePredictionResult(result) {
+  const text = extractAssistantText(result);
+  return parseJsonObject(text) || {
+    rawText: text || JSON.stringify(result)
+  };
+}
+
+function upsertPrediction(match, result, modelName) {
+  const summary = summarizePredictionResult(result);
+  const keys = [...new Set([match?.id, matchKeyForPrediction(match)].filter(Boolean))];
+  const now = new Date().toISOString();
+  const stmt = database().prepare(`
+    INSERT INTO predictions (prediction_key, match_id, match_date, home, away, model_name, summary_json, raw_json, generated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(prediction_key) DO UPDATE SET
+      match_id = excluded.match_id,
+      match_date = excluded.match_date,
+      home = excluded.home,
+      away = excluded.away,
+      model_name = excluded.model_name,
+      summary_json = excluded.summary_json,
+      raw_json = excluded.raw_json,
+      generated_at = excluded.generated_at
+  `);
+  keys.forEach((key) => stmt.run(
+    key,
+    match?.id || "",
+    match?.date || "",
+    match?.home || "",
+    match?.away || "",
+    modelName || "",
+    JSON.stringify(summary),
+    JSON.stringify(result),
+    now
+  ));
+  return summary;
 }
 
 function jsonResponse(res, status, data) {
@@ -392,29 +558,6 @@ function modelSettings(config) {
   };
 }
 
-function extractAssistantText(payload) {
-  return payload?.choices?.[0]?.message?.content
-    || payload?.choices?.[0]?.text
-    || payload?.output_text
-    || "";
-}
-
-function parseJsonObject(text) {
-  const raw = String(text || "").trim();
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    try {
-      return JSON.parse(match[0]);
-    } catch {
-      return null;
-    }
-  }
-}
-
 async function callChatCompletions(config, messages, temperature = config.model?.temperature ?? 0.2, timeoutMs = 30000) {
   const settings = modelSettings(config);
   if (!settings.apiUrl || !settings.apiKey || !settings.model) {
@@ -620,12 +763,26 @@ async function fetchSquad(team) {
 
 function readModelConfig() {
   if (fs.existsSync(MODEL_CONFIG)) return JSON.parse(fs.readFileSync(MODEL_CONFIG, "utf8"));
+  if (fs.existsSync(MODEL_CONFIG_EXAMPLE)) return JSON.parse(fs.readFileSync(MODEL_CONFIG_EXAMPLE, "utf8"));
   return {};
 }
 
 function readPredictions() {
-  if (fs.existsSync(PREDICTION_CACHE)) return JSON.parse(fs.readFileSync(PREDICTION_CACHE, "utf8"));
-  return {};
+  const predictions = fs.existsSync(PREDICTION_CACHE) ? JSON.parse(fs.readFileSync(PREDICTION_CACHE, "utf8")) : {};
+  const rows = database().prepare("SELECT prediction_key, match_id, match_date, home, away, model_name, summary_json, raw_json, generated_at FROM predictions").all();
+  rows.forEach((row) => {
+    predictions[row.prediction_key] = {
+      matchId: row.match_id,
+      date: row.match_date,
+      home: row.home,
+      away: row.away,
+      modelName: row.model_name,
+      generatedAt: row.generated_at,
+      result: JSON.parse(row.raw_json),
+      summary: row.summary_json ? JSON.parse(row.summary_json) : null
+    };
+  });
+  return predictions;
 }
 
 function writePredictions(predictions) {
@@ -634,6 +791,10 @@ function writePredictions(predictions) {
 }
 
 function writeModelConfig(config) {
+  (config.profiles || []).forEach(upsertModelProfile);
+  if (config.model?.model || config.model?.apiUrl) {
+    upsertModelProfile({ name: config.model.profileName || config.model.model || "当前模型", model: config.model });
+  }
   fs.writeFileSync(MODEL_CONFIG, JSON.stringify(config, null, 2));
   return config;
 }
@@ -800,14 +961,17 @@ async function predictMatch(match) {
   if (result.mode !== "llm") return result;
   const predictions = readPredictions();
   const key = matchPredictionKey(match);
+  const summary = upsertPrediction(match, result.result, config.model?.model || "");
   predictions[key] = {
     matchId: match?.id || "",
     date: match?.date || "",
     home: match?.home || "",
     away: match?.away || "",
     generatedAt: new Date().toISOString(),
-    result: result.result
+    result: result.result,
+    summary
   };
+  predictions[matchKeyForPrediction(match)] = predictions[key];
   writePredictions(predictions);
   return { ...result, saved: predictions[key] };
 }
@@ -854,6 +1018,7 @@ async function getTeamDetail(teamName) {
       source: squad.source,
       warning: squad.warning || ""
     };
+    upsertTeamRecord(teamName, payload);
     fs.writeFileSync(cacheFile, JSON.stringify(payload, null, 2));
     return payload;
   } catch (error) {
@@ -886,6 +1051,7 @@ function updateTeamCache(payload) {
         updatedAt: new Date().toISOString(),
         source: "ESPN scoreboard team links"
       };
+      upsertTeamRecord(nameZh, existing[nameZh]);
     }
   }
   fs.writeFileSync(TEAM_CACHE, JSON.stringify(existing, null, 2));
@@ -1024,6 +1190,8 @@ async function requestHandler(req, res) {
 
 async function main() {
   ensureDirs();
+  database();
+  syncModelProfilesToDb();
   if (process.argv.includes("--once")) {
     const results = await pollWindow();
     console.log(JSON.stringify(results, null, 2));

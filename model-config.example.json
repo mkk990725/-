@@ -1,0 +1,47 @@
+{
+  "model": {
+    "provider": "openai-compatible",
+    "apiUrl": "",
+    "apiKey": "",
+    "model": "",
+    "temperature": 0.2,
+    "outputLanguage": "zh-CN"
+  },
+  "profiles": [],
+  "weights": {
+    "strength": 1.25,
+    "coach": 1.35,
+    "tactics": 1.25,
+    "players": 1.1,
+    "motivation": 0.9,
+    "market": 0.45,
+    "uncertainty": -1.15
+  },
+  "inputs": {
+    "includeSourceSufficiencyCheck": true,
+    "includeCoachProfile": true,
+    "includeCoachAdjustmentHistory": true,
+    "includeSquadAndPlayerPhysicals": true,
+    "includeClubLevel": true,
+    "includeLikelyLineup": true,
+    "includeInjuriesAndSuspensions": true,
+    "includeTacticalMatchup": true,
+    "includeMotivationSchedule": true,
+    "includeMarketCheck": true,
+    "includeSourceReliability": true
+  },
+  "discipline": [
+    "大模型负责主要分析，skills 只规定如何使用数据和如何过滤。",
+    "预测前必须先做信息源充足性与真实性校验。",
+    "资料不足、实力断层、市场过热且战术证据不足时必须降级或跳过。",
+    "教练策略必须结合历史执行风格、当前阵容经验、发布会、首发和过往调整样本。",
+    "上半场和全场分开判断，下半场判断必须注明上半场事件触发后的不确定性增加。",
+    "娱乐比分和半全场只能作为娱乐参考，最多给前三个，不能作为投资建议。"
+  ],
+  "sourcePolicy": {
+    "tier1": ["FIFA", "国家队/足协官方", "官方首发", "官方发布会"],
+    "tier2": ["ESPN", "FBref", "Transfermarkt", "Sofascore"],
+    "tier3": ["懂球帝", "小红书", "微博", "Reddit"],
+    "rule": "tier3 只能做中文名称、球迷观察、舆情和线索发现，不能单独作为事实结论；伤停、首发、教练表态和战术变化必须尽量交叉验证。"
+  }
+}

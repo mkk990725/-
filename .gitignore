@@ -1,3 +1,7 @@
 .cache/
+model-config.json
+football-agent.db-shm
+football-agent.db-wal
+football-agent.db-journal
 node_modules/
 *.log
