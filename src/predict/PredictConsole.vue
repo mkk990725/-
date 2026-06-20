@@ -5,7 +5,7 @@
         <header class="navbar">
           <a class="brand" href="/index.html">智能体工作台</a>
           <div class="nav-right">
-            <n-button text tag="a" href="/index.html" class="home-link">返回主界面</n-button>
+            <a href="/index.html" class="home-link">返回主界面</a>
             <span class="status-dot"></span>
             <span class="status-text">运行中</span>
           </div>
@@ -32,13 +32,11 @@
                   <n-form-item label="比赛日期">
                     <div class="date-row">
                       <n-button secondary @click="shiftDate(-1)">‹</n-button>
-                      <n-date-picker
-                        v-model:formatted-value="selectedDate"
-                        value-format="yyyy-MM-dd"
+                      <input
+                        v-model="selectedDate"
                         type="date"
-                        :clearable="false"
-                        class="date-picker"
-                        @update:formatted-value="loadMatches"
+                        class="date-picker native-control"
+                        @change="loadMatches"
                       />
                       <n-button secondary @click="shiftDate(1)">›</n-button>
                     </div>
@@ -47,12 +45,12 @@
 
                 <n-grid-item :span="24" :m="17">
                   <n-form-item label="比赛">
-                    <n-select
-                      v-model:value="selectedMatchKey"
-                      :options="matchOptions"
-                      filterable
-                      placeholder="请选择比赛"
-                    />
+                    <select v-model="selectedMatchKey" class="match-select native-control">
+                      <option value="" disabled>请选择比赛</option>
+                      <option v-for="match in matches" :key="match.key" :value="match.key">
+                        {{ match.kickoffTime }} · {{ match.home }} vs {{ match.away }}
+                      </option>
+                    </select>
                   </n-form-item>
                 </n-grid-item>
               </n-grid>
@@ -574,6 +572,32 @@ loadDataSources().catch(() => {});
 
 .date-picker {
   width: 100%;
+}
+
+.native-control {
+  min-height: 38px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: 8px;
+  color: #e5eefb;
+  background: rgba(15, 23, 42, 0.82);
+  padding: 0 12px;
+  font: inherit;
+  outline: none;
+}
+
+.native-control:hover,
+.native-control:focus {
+  border-color: rgba(56, 189, 248, 0.82);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.14);
+}
+
+.match-select {
+  width: 100%;
+}
+
+.match-select option {
+  color: #0f172a;
+  background: #ffffff;
 }
 
 .button-row {
