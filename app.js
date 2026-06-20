@@ -36,7 +36,7 @@ const statusText = {
   watch: "谨慎观察",
   avoid: "建议跳过",
   review: "已赛复盘",
-  synced: "待补资料"
+  synced: "待预测"
 };
 
 const riskText = {
@@ -122,7 +122,15 @@ function factorSummary(factor) {
 
 function normalizedAnalysisScore(match) {
   const prediction = predictionFor(match);
-  if (prediction?.score) return Number(prediction.score);
+  const summary = normalizePredictionSummary(prediction);
+  const predictedScore = summary?.analysis_score || summary?.score || summary?.confidence_score || prediction?.score;
+  if (predictedScore) return Math.max(20, Math.min(95, Math.round(Number(String(predictedScore).replace(/[^\d.]/g, "")) || 50)));
+  if (!match.factors) {
+    if (match.status === "review") return 55;
+    if (match.status === "watch") return 52;
+    if (match.status === "avoid") return 34;
+    return 42;
+  }
   const entries = Object.entries(match.factors);
   const totalWeight = entries.reduce((sum, [key]) => sum + Math.abs(state.weights[key]), 0);
   const weighted = entries.reduce((sum, [key, factor]) => sum + factorScore(factor) * state.weights[key], 0);
@@ -179,7 +187,7 @@ function sortMatches(matches) {
   return [...matches].sort((a, b) => {
     const predicted = Number(Boolean(predictionFor(b))) - Number(Boolean(predictionFor(a)));
     if (state.sortMode === "score-desc") {
-      return predicted || a.date.localeCompare(b.date);
+      return predicted || normalizedAnalysisScore(b) - normalizedAnalysisScore(a) || a.date.localeCompare(b.date);
     }
     if (state.sortMode === "date-desc") {
       return b.date.localeCompare(a.date) || predicted || (a.kickoffTime || "").localeCompare(b.kickoffTime || "");
@@ -332,7 +340,7 @@ function makeSyncedMatch(event) {
     score,
     resultNote: completed ? `${status.detail || "FT"} · ${beijingTimeFromIso(event.date)} · ${shotsNote}` : `${status.shortDetail || "Scheduled"} · ${beijingTimeFromIso(event.date)} · ${shotsNote}`,
     headline: completed ? "已赛比赛，进入复盘样本池。" : "已同步赛程，但还没有完成深度分析。",
-    recommendation: completed ? "赛后复盘" : autoStatus === "avoid" ? "建议跳过：热门过深且资料不足" : autoStatus === "watch" ? "谨慎观察：待补资料" : "待补资料：不直接给结论",
+    recommendation: completed ? "赛后复盘" : autoStatus === "avoid" ? "建议跳过：热门过深且证据不足" : autoStatus === "watch" ? "谨慎观察：证据仍需校验" : "待预测：证据不足，先低信心比较",
     confidence: completed ? 50 : 42,
     factors: {
       strength: {
@@ -512,6 +520,7 @@ function renderMatchList() {
     .map((match) => {
       const active = match.id === state.selectedId ? " active" : "";
       const prediction = predictionFor(match);
+      const analysisScore = normalizedAnalysisScore(match);
       return `
         <button class="match-card${active}" data-match-id="${match.id}" type="button">
           <div class="match-card-top">
@@ -525,7 +534,7 @@ function renderMatchList() {
           </div>
           <div class="mini-score">
             <span>${match.kickoffTime || "可分析度"}</span>
-            <strong>${prediction ? "已预测" : "未预测"}</strong>
+            <strong>${prediction ? "已预测" : "未预测"} · ${analysisScore}分</strong>
           </div>
         </button>
       `;
@@ -599,9 +608,56 @@ function renderVerdicts(match) {
 
 function valueText(value, fallback = "待模型给出") {
   if (value === null || value === undefined || value === "") return fallback;
-  if (Array.isArray(value)) return value.map((item) => typeof item === "object" ? JSON.stringify(item) : item).join("；");
-  if (typeof value === "object") return value.summary || value.text || value.result || JSON.stringify(value);
+  if (Array.isArray(value)) return value.map((item) => valueText(item, "")).filter(Boolean).join("；");
+  if (typeof value === "object") {
+    if (value.summary || value.text || value.result || value.reason || value.tendency) {
+      return value.summary || value.text || value.result || value.reason || value.tendency;
+    }
+    return Object.entries(value)
+      .filter(([, item]) => item !== null && item !== undefined && item !== "")
+      .map(([key, item]) => `${key}：${valueText(item, "")}`)
+      .join("；") || fallback;
+  }
   return String(value);
+}
+
+function parseJsonObject(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]);
+    } catch {
+      return null;
+    }
+  }
+}
+
+function assistantText(payload) {
+  return payload?.choices?.[0]?.message?.content
+    || payload?.choices?.[0]?.text
+    || payload?.output_text
+    || "";
+}
+
+function normalizePredictionSummary(prediction) {
+  let summary = prediction?.summary || prediction?.result?.summary || prediction?.result || prediction || {};
+  const text = assistantText(summary) || assistantText(summary.result) || summary.rawText;
+  const parsed = parseJsonObject(text);
+  if (parsed) summary = parsed;
+  return summary;
+}
+
+function percentText(value, fallback = "未给出") {
+  if (value === null || value === undefined || value === "") return fallback;
+  const raw = String(value);
+  const num = Number(raw.replace(/[^\d.]/g, ""));
+  if (!Number.isFinite(num)) return raw;
+  return `${Math.round(Math.max(0, Math.min(100, num)))}%`;
 }
 
 function renderEntertainmentTop3(items) {
@@ -621,16 +677,17 @@ function renderEntertainmentTop3(items) {
 }
 
 function renderPredictionSummary(prediction) {
-  const summary = prediction.summary || prediction.result?.summary || prediction.result || prediction;
+  const summary = normalizePredictionSummary(prediction);
   const sourceCheck = summary.source_check || summary.sourceCheck || {};
   const winner = summary.winner || summary.win_tendency || summary.full_time?.winner || summary.full_time?.tendency;
   const confidence = summary.confidence || summary.confidence_score || summary.source_reliability?.confidence || "模型未给出明确信心程度";
+  const analysisScore = summary.analysis_score || summary.score || summary.evidence_score || normalizedAnalysisScore(getSelectedMatch());
   return `
     <div class="prediction-summary-grid">
       <article class="result-card accent">
         <span>胜负倾向</span>
         <strong>${valueText(winner, "模型未给出明确胜负倾向")}</strong>
-        <p>信心程度：${valueText(confidence)}</p>
+        <p><b class="score-chip">信心 ${percentText(confidence)}</b><b class="score-chip muted">可分析度 ${percentText(analysisScore)}</b></p>
       </article>
       <article class="result-card">
         <span>是否可分析</span>

@@ -323,25 +323,50 @@ function parsePrediction(payload) {
       is_analyzable: false
     };
   }
-  if (payload.saved?.summary) return payload.saved.summary;
+  if (payload.saved?.summary) return normalizePredictionSummary(payload.saved.summary);
   const text = assistantText(payload);
   try {
-    return JSON.parse(text);
+    return normalizePredictionSummary(JSON.parse(text));
   } catch {
     const match = text.match(/\{[\s\S]*\}/);
     if (match) {
       try {
-        return JSON.parse(match[0]);
+        return normalizePredictionSummary(JSON.parse(match[0]));
       } catch {}
     }
   }
-  return { key_evidence: text || JSON.stringify(payload) };
+  return { key_evidence: text || valueText(payload) };
+}
+
+function normalizePredictionSummary(summary) {
+  const text = assistantText(summary) || assistantText(summary?.result) || summary?.rawText;
+  if (text) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      const match = String(text).match(/\{[\s\S]*\}/);
+      if (match) {
+        try {
+          return JSON.parse(match[0]);
+        } catch {}
+      }
+    }
+  }
+  return summary || {};
 }
 
 function valueText(value, fallback = "待模型给出") {
   if (value === null || value === undefined || value === "") return fallback;
-  if (Array.isArray(value)) return value.map((item) => typeof item === "object" ? JSON.stringify(item) : item).join("；");
-  if (typeof value === "object") return value.summary || value.text || value.result || JSON.stringify(value);
+  if (Array.isArray(value)) return value.map((item) => valueText(item, "")).filter(Boolean).join("；");
+  if (typeof value === "object") {
+    if (value.summary || value.text || value.result || value.reason || value.tendency) {
+      return value.summary || value.text || value.result || value.reason || value.tendency;
+    }
+    return Object.entries(value)
+      .filter(([, item]) => item !== null && item !== undefined && item !== "")
+      .map(([key, item]) => `${key}：${valueText(item, "")}`)
+      .join("；") || fallback;
+  }
   return String(value);
 }
 
@@ -398,7 +423,7 @@ async function runTask() {
     selectedMatchKey.value = taskMatchKey;
     completedSteps.value = 2;
     await sleep(1500);
-    log("正在推理分析：检查 xG、每脚射门平均 xG、首轮真实表现与战术证据是否缺失...");
+    log("正在推理分析：检查真实表现质量、机会质量、阵容完整度与战术证据是否缺失...");
     completedSteps.value = 3;
     await sleep(1500);
     log("正在生成回复...");

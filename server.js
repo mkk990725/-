@@ -1025,7 +1025,7 @@ function buildEvaluationPrompt(analysisInput, config) {
     "如果信息源不足，必须明确列出缺哪些信息、去哪类来源补：The Guardian 比赛直播记录、The Analyst/Opta 赛前和数据分析文章、FIFA 官方技术统计、全场录像观察、官方首发/伤停/发布会。",
     "分析球队整体时必须区分控球/推进/射门数量与稳定破门能力。优先寻找能表达真实表现质量的数据族，例如机会质量、射门位置与每脚射门质量、禁区触球、重大机会、定位球质量、压迫强度、推进到三区次数和防线承压。xG、每脚射门平均 xG 只是这类数据的例子，不是唯一指标。示例：如果球队首轮射门很多但每脚射门质量很低，应警惕其进攻被射门数量高估。",
     "不要承诺精确比分，不要承诺稳定盈利。娱乐比分和半全场只能标注为娱乐参考，不能作为投资建议。",
-    "建议输出 JSON，字段至少包含 source_check、is_analyzable、filter_reason、first_half、full_time、key_evidence、information_gaps、source_reliability、uncertainty、team_data_check、entertainment_top3。",
+    "建议输出 JSON，字段至少包含 source_check、is_analyzable、analysis_score、confidence_score、filter_reason、first_half、full_time、key_evidence、information_gaps、source_reliability、uncertainty、team_data_check、entertainment_top3。analysis_score 是 0-100 的可分析度/证据充足度评分，即使证据不足也要给出低分并说明原因，不能只写待补资料。",
     `分析技能：\n${skill}`,
     `当前配置：${JSON.stringify(config)}`,
     `比赛与球队输入：${JSON.stringify(analysisInput)}`

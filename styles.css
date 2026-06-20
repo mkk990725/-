@@ -607,6 +607,23 @@ h1 {
   line-height: 1.6;
 }
 
+.score-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  margin: 4px 6px 0 0;
+  border-radius: 999px;
+  color: #07513f;
+  background: #dff6ee;
+  font-size: 12px;
+}
+
+.score-chip.muted {
+  color: #174d73;
+  background: #e3f1fb;
+}
+
 .prediction-section {
   padding: 14px;
   margin-top: 12px;
