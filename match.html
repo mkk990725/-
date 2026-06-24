@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>比赛详情</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-page="match-detail">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-block">
+          <div class="brand-mark"><img src="favicon.svg" alt="" /></div>
+          <div>
+            <h1>赛前分析台</h1>
+            <p>世界杯赛程 · 模型预测工作台</p>
+          </div>
+        </div>
+
+        <nav class="side-nav" aria-label="主导航">
+          <a class="active" href="index.html">比赛分析</a>
+          <a href="config.html">模型配置</a>
+          <a href="predict.html">预测模块</a>
+          <a href="teams.html">球队资料</a>
+          <a href="skills.html">分析技能</a>
+        </nav>
+      </aside>
+
+      <main class="main-panel detail-page">
+        <a class="back-link" href="index.html">返回比赛列表</a>
+        <section class="match-hero" id="matchHero"></section>
+
+        <section class="detail-two-column">
+          <article class="primary-stack">
+            <div class="section-head">
+              <div>
+                <span class="muted-label">预测结果</span>
+                <h2>比赛判断</h2>
+              </div>
+              <a class="tag link-tag" id="predictLink" href="predict.html">去预测模块</a>
+            </div>
+            <div class="prediction-result" id="predictionResult"></div>
+          </article>
+
+          <aside class="side-stack">
+            <div class="section-head compact">
+              <div>
+                <span class="muted-label">Reuters / AP / FIFA / Guardian</span>
+                <h2>赛前信息</h2>
+              </div>
+              <button class="secondary-action" id="prematchUpdate" type="button">更新</button>
+            </div>
+            <div class="prematch-panel" id="prematchPanel">
+              <div class="empty-state">点击“更新”检查赛前 24 小时、3-6 小时、60-75 分钟的信息源。</div>
+            </div>
+          </aside>
+        </section>
+
+        <section class="detail-card" id="tacticalProfilePanel"></section>
+      </main>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -21,11 +21,17 @@ const state = {
   }
 };
 
+const pageMode = document.body?.dataset?.page || "match-detail";
+
 function currentBeijingIsoDate() {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" });
 }
 
 function initialSelectedMatchId() {
+  const urlMatchId = new URLSearchParams(window.location.search).get("match");
+  if (urlMatchId && window.WORLD_CUP_FIXTURES.some((match) => match.id === urlMatchId)) return urlMatchId;
+  const cachedMatchId = localStorage.getItem("selectedMatchId");
+  if (cachedMatchId && window.WORLD_CUP_FIXTURES.some((match) => match.id === cachedMatchId)) return cachedMatchId;
   const firstToday = window.WORLD_CUP_FIXTURES
     .filter((match) => match.date === INITIAL_DATE)
     .sort((a, b) => (a.kickoffTime || "").localeCompare(b.kickoffTime || ""))[0];
@@ -107,6 +113,7 @@ const el = {
   predictLink: document.getElementById("predictLink"),
   prematchUpdate: document.getElementById("prematchUpdate"),
   prematchPanel: document.getElementById("prematchPanel"),
+  tacticalProfilePanel: document.getElementById("tacticalProfilePanel"),
 };
 
 function zhTeam(name) {
@@ -638,6 +645,7 @@ function uniqueEvents(events) {
 }
 
 function renderMatchList() {
+  if (!el.list) return;
   ensureUsableFilter();
   const matches = visibleMatches();
   el.list.innerHTML = matches.length ? matches
@@ -665,6 +673,7 @@ function renderMatchList() {
 }
 
 function renderHero(match) {
+  if (!el.hero) return;
   const teamsHref = `teams.html?match=${encodeURIComponent(match.id)}`;
 
   el.hero.innerHTML = `
@@ -703,28 +712,19 @@ function renderHero(match) {
 }
 
 function renderVerdicts(match) {
+  if (!el.predictionResult) return;
   const prediction = predictionFor(match);
-  const review = state.reviews[match.id];
   const actualPanel = match.status === "review" ? `
     <div class="review-card">
-      <strong>已赛真实情况（自动同步）</strong>
+      <strong>已赛真实结果</strong>
       <p>${match.home} ${match.score} ${match.away}</p>
       <p>${match.resultNote || "已完赛，详细过程数据待补充。"}</p>
     </div>
   ` : "";
-  const comparePanel = match.status === "review" && prediction ? `
-    <div class="review-card">
-      <strong>预测情况对比</strong>
-      <p>预测得分：${review ? "见下方复盘结果" : "待大模型复盘评分"}</p>
-      <p>复盘会对照上半场走势、全场走势、关键证据、信息缺口和最终比分逐项解释偏差。</p>
-      <button class="secondary-action" type="button" data-review-match="${match.id}">调用大模型复盘</button>
-    </div>
-  ` : "";
-  const reviewPanel = review ? `<pre>${JSON.stringify(review.result || review, null, 2)}</pre>` : "";
   const predictionPanel = prediction
     ? renderPredictionSummary(prediction)
     : renderPredictionPlaceholder();
-  el.predictionResult.innerHTML = `${actualPanel}${predictionPanel}${comparePanel}${reviewPanel}`;
+  el.predictionResult.innerHTML = `${actualPanel}${predictionPanel}`;
   if (el.predictLink) el.predictLink.href = `predict.html?match=${encodeURIComponent(match.id)}`;
 }
 
@@ -978,9 +978,7 @@ function simpleDirectionHit(match, summary) {
 
 function renderPredictionSummary(prediction) {
   const summary = normalizePredictionSummary(prediction);
-  const match = getSelectedMatch();
   const scoreDetail = scoreMatchEvidence(getSelectedMatch());
-  const sourceCheck = summary.source_check || summary.sourceCheck || {};
   const winner = summary.winner || summary.win_tendency || summary.full_time?.winner || summary.full_time?.tendency;
   const confidence = summary.confidence || summary.confidence_score || summary.source_reliability?.confidence || "模型未给出明确信心程度";
   const situation = summaryText(summary.full_time || summary.fullTime || summary.situation || summary.key_evidence, "模型未给出整场局势摘要。");
@@ -992,18 +990,18 @@ function renderPredictionSummary(prediction) {
     <section class="prediction-brief">
       <span>整场局势预测分析</span>
       <strong>${situation}</strong>
-      <p>${summaryText(summary.key_evidence || summary.evidence || summary.filter_reason, "关键依据待补充。")}</p>
+      <p><b>上半场：</b>${firstHalf}</p>
     </section>
     <div class="prediction-summary-grid">
       <article class="result-card accent">
         <span>胜平负</span>
         <strong>${valueText(winner, "模型未给出明确胜负倾向")}</strong>
-        <p><b class="score-chip">信心 ${scoreDetail.confidenceScore}%</b><b class="score-chip muted">可分析度 ${scoreDetail.score}%</b></p>
+        <p><b class="score-chip">信心 ${percentText(confidence, `${scoreDetail.confidenceScore}%`)}</b></p>
       </article>
       <article class="result-card">
         <span>进球数</span>
         <strong>${goals}</strong>
-        <p>${summary.is_analyzable === false ? "建议跳过" : "可分析 / 谨慎观察"}</p>
+        <p>只展示模型给出的真实判断，不展示硬编码评分。</p>
       </article>
       <article class="result-card">
         <span>比分</span>
@@ -1016,66 +1014,46 @@ function renderPredictionSummary(prediction) {
         <p>${firstHalf}</p>
       </article>
     </div>
-    <div class="prediction-section">
-      <h3>评分依据</h3>
-      <p>${scoreDetail.reasons.slice(0, 8).map((item) => `• ${item}`).join("<br>")}</p>
-    </div>
-    ${match.status === "review" ? (() => {
-      const hit = simpleDirectionHit(match, summary);
-      return `<div class="prediction-section">
-        <h3>第一轮/已赛样本校验</h3>
-        <p>${hit ? `${hit.hit ? "方向命中" : "方向未命中"}；${hit.note}` : "未赛或比分不可解析，暂不能校验。"}</p>
-      </div>`;
-    })() : ""}
-    <div class="prediction-section">
-      <h3>上半场可能走势</h3>
-      <p>${valueText(summary.first_half || summary.firstHalf)}</p>
-    </div>
-    <div class="prediction-section">
-      <h3>技战术画像</h3>
-      <p>${valueText(summary.tactical_profile || summary.tacticalProfile, "模型未单独给出技战术画像。")}</p>
-    </div>
-    <div class="prediction-section">
-      <h3>关键球员功能</h3>
-      <p>${valueText(summary.player_functions || summary.playerFunctions, "模型未单独给出球员功能拆解。")}</p>
-    </div>
-    <div class="prediction-section">
-      <h3>双方对位</h3>
-      <p>${valueText(summary.matchup || summary.matchup_analysis || summary.matchupAnalysis, "模型未单独给出对位分析。")}</p>
-    </div>
-    <div class="prediction-section">
-      <h3>三分支推演</h3>
-      ${renderBranches(summary.branches || summary.match_branches || summary.scenarios)}
-    </div>
-    <div class="prediction-section">
-      <h3>全场可能走势</h3>
-      <p>${valueText(summary.full_time || summary.fullTime)}</p>
-    </div>
-    <div class="prediction-section">
-      <h3>关键依据</h3>
-      <p>${valueText(summary.key_evidence || summary.evidence)}</p>
-    </div>
-    <div class="prediction-section">
-      <h3>球队数据校验</h3>
-      <p>${valueText(summary.team_data_check, "模型未单独给出球队数据校验。")}</p>
-    </div>
-    <div class="prediction-section">
-      <h3>盘口验证</h3>
-      <p>${valueText(summary.market_check || summary.marketCheck, "模型未单独给出盘口验证。")}</p>
-    </div>
-    <div class="prediction-section">
-      <h3>娱乐参考前三项</h3>
-      ${renderEntertainmentTop3(summary.entertainment_top3 || summary.entertainmentTop3)}
-    </div>
   `;
 }
 
 function renderScripts(match) {
+  if (!el.script) return;
   el.script.innerHTML = `<div class="empty-state">走势推演由大模型预测生成，当前为空。</div>`;
 }
 
 function renderFactors(match) {
+  if (!el.factors) return;
   el.factors.innerHTML = `<div class="empty-state">模型证据、信息缺口和来源可信度会在生成预测后展示。</div>`;
+}
+
+function renderTacticalProfile(match) {
+  if (!el.tacticalProfilePanel) return;
+  const prediction = predictionFor(match);
+  const summary = prediction ? normalizePredictionSummary(prediction) : {};
+  el.tacticalProfilePanel.innerHTML = `
+    <div class="section-head compact">
+      <div>
+        <span class="muted-label">独立模块</span>
+        <h2>技战术画像</h2>
+      </div>
+      <a class="tag link-tag" href="teams.html?match=${encodeURIComponent(match.id)}">查看球队资料</a>
+    </div>
+    <div class="tactical-clean-grid">
+      <article>
+        <span>球队技战术</span>
+        <p>${valueText(summary.tactical_profile || summary.tacticalProfile, "暂无模型生成的技战术画像。")}</p>
+      </article>
+      <article>
+        <span>关键球员功能</span>
+        <p>${valueText(summary.player_functions || summary.playerFunctions, "暂无模型生成的球员功能拆解。")}</p>
+      </article>
+      <article>
+        <span>双方对位</span>
+        <p>${valueText(summary.matchup || summary.matchup_analysis || summary.matchupAnalysis, "暂无模型生成的双方对位分析。")}</p>
+      </article>
+    </div>
+  `;
 }
 
 function renderPrematchInfo(info) {
@@ -1170,11 +1148,11 @@ function render() {
   dedupeMatchesByKey();
   ensureUsableFilter();
   const visible = visibleMatches();
-  if (visible.length && !visible.some((item) => item.id === state.selectedId)) {
+  if (pageMode === "match-list" && visible.length && !visible.some((item) => item.id === state.selectedId)) {
     state.selectedId = visible[0].id;
   }
-  el.dateStart.value = state.dateStart;
-  el.dateEnd.value = state.dateEnd;
+  if (el.dateStart) el.dateStart.value = state.dateStart;
+  if (el.dateEnd) el.dateEnd.value = state.dateEnd;
   const match = getSelectedMatch();
   localStorage.setItem("selectedMatchId", match.id);
   renderMatchList();
@@ -1182,6 +1160,7 @@ function render() {
   renderVerdicts(match);
   renderScripts(match);
   renderFactors(match);
+  renderTacticalProfile(match);
   renderPrematchInfo(state.prematchInfoByMatch[match.id] || null);
 }
 
@@ -1199,14 +1178,19 @@ document.querySelectorAll(".filter-tabs button").forEach((button) => {
   });
 });
 
-el.list.addEventListener("click", (event) => {
+el.list?.addEventListener("click", (event) => {
   const card = event.target.closest("[data-match-id]");
   if (!card) return;
   state.selectedId = card.dataset.matchId;
+  localStorage.setItem("selectedMatchId", state.selectedId);
+  if (pageMode === "match-list") {
+    window.location.href = `match.html?match=${encodeURIComponent(state.selectedId)}`;
+    return;
+  }
   render();
 });
 
-el.applyDate.addEventListener("click", applyDateRange);
+el.applyDate?.addEventListener("click", applyDateRange);
 
 el.prevMatchDay?.addEventListener("click", () => switchMatchDay(-1));
 
@@ -1214,12 +1198,12 @@ el.nextMatchDay?.addEventListener("click", () => switchMatchDay(1));
 
 el.prematchUpdate?.addEventListener("click", updatePrematchInfoForSelectedMatch);
 
-el.sortMode.addEventListener("change", () => {
+el.sortMode?.addEventListener("change", () => {
   state.sortMode = el.sortMode.value;
   render();
 });
 
-el.predictionResult.addEventListener("click", async (event) => {
+el.predictionResult?.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-review-match]");
   if (!button) return;
   const match = getSelectedMatch();

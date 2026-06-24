@@ -7,7 +7,7 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body data-page="match-list">
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand-block">
@@ -27,13 +27,16 @@
         </nav>
       </aside>
 
-      <main class="main-panel">
-        <section class="analysis-toolbar">
+      <main class="main-panel list-home">
+        <section class="analysis-toolbar compact-hero">
           <div>
             <span class="muted-label">后台自动更新</span>
-            <h1>比赛分析</h1>
-            <p>赛程由服务端每 30 秒轮询更新；预测结果来自“预测模块”调用大模型后同步。</p>
+            <h1>比赛列表</h1>
+            <p>选择日期后查看当天比赛。点击任意比赛进入详情页，只展示真实赛程、预测结果、赛前信息和技战术画像。</p>
           </div>
+        </section>
+
+        <section class="list-home-card">
           <div class="date-panel">
             <div class="date-range-fields">
               <label>
@@ -49,25 +52,23 @@
             <label>
               <span class="muted-label">排序</span>
               <select id="sortMode">
-                <option value="score-desc">有预测优先</option>
+                <option value="score-desc">已预测优先</option>
                 <option value="date-asc">比赛日期从近到远</option>
                 <option value="date-desc">比赛日期从远到近</option>
               </select>
             </label>
           </div>
-        </section>
 
-        <section class="filter-tabs" role="tablist" aria-label="比赛筛选">
-          <button class="active" data-filter="all" type="button">全部</button>
-          <button data-filter="actionable" type="button">推荐关注</button>
-          <button data-filter="watch" type="button">谨慎观察</button>
-          <button data-filter="avoid" type="button">建议跳过</button>
-          <button data-filter="synced" type="button">待预测</button>
-          <button data-filter="review" type="button">已赛复盘</button>
-        </section>
+          <section class="filter-tabs" role="tablist" aria-label="比赛筛选">
+            <button class="active" data-filter="all" type="button">全部</button>
+            <button data-filter="actionable" type="button">推荐关注</button>
+            <button data-filter="watch" type="button">谨慎观察</button>
+            <button data-filter="avoid" type="button">建议跳过</button>
+            <button data-filter="synced" type="button">待预测</button>
+            <button data-filter="review" type="button">已赛复盘</button>
+          </section>
 
-        <section class="analysis-layout">
-          <section class="match-list-panel">
+          <section class="match-list-panel centered-list">
             <div class="section-head compact">
               <div>
                 <span class="muted-label">比赛列表</span>
@@ -79,53 +80,6 @@
               </div>
             </div>
             <div class="match-list" id="matchList" aria-label="比赛列表"></div>
-          </section>
-
-          <section class="analysis-detail">
-            <section class="match-hero" id="matchHero"></section>
-
-            <section class="content-grid">
-              <article class="primary-stack" id="matchJudgment">
-                <div class="section-head">
-                  <div>
-                    <span class="muted-label">大模型预测结果</span>
-                    <h2>赛前判断</h2>
-                  </div>
-                  <a class="tag link-tag" id="predictLink" href="predict.html">去预测模块</a>
-                </div>
-                <div class="prediction-result" id="predictionResult"></div>
-
-                <div class="section-head compact" id="matchScript">
-                  <div>
-                    <span class="muted-label">走势推演</span>
-                    <h2>上半场 / 全场</h2>
-                  </div>
-                </div>
-                <div class="script-panel" id="scriptPanel"></div>
-              </article>
-
-              <aside class="side-stack" id="factorSection">
-                <div class="section-head compact">
-                  <div>
-                    <span class="muted-label">Reuters / AP / FIFA / Guardian</span>
-                    <h2>赛前信息</h2>
-                  </div>
-                  <button class="secondary-action" id="prematchUpdate" type="button">更新</button>
-                </div>
-                <div class="prematch-panel" id="prematchPanel">
-                  <div class="empty-state">选择比赛后，点击“更新”检查赛前 24 小时、3-6 小时、60-75 分钟的信息源。</div>
-                </div>
-
-                <div class="section-head compact">
-                  <div>
-                    <span class="muted-label">模型输入</span>
-                    <h2>信息完整度</h2>
-                  </div>
-                </div>
-                <div class="factor-note">这里不再展示硬编码预测分数。生成预测后，会展示模型返回的证据、缺口和来源可信度。</div>
-                <div class="factor-list" id="factorList"></div>
-              </aside>
-            </section>
           </section>
         </section>
       </main>
