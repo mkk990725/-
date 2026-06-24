@@ -120,24 +120,143 @@ function factorSummary(factor) {
   return Array.isArray(factor) ? factor[1] : factor.summary;
 }
 
-function normalizedAnalysisScore(match) {
+function numericPercent(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const num = Number(String(value).replace(/[^\d.]/g, ""));
+  return Number.isFinite(num) ? Math.max(0, Math.min(100, num)) : null;
+}
+
+function hasUsefulValue(value) {
+  if (value === null || value === undefined || value === "") return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return true;
+}
+
+function sourceCompletenessScore(summary) {
+  if (!summary || !Object.keys(summary).length) {
+    return { score: 0, reasons: ["未生成预测，尚未做信息源校验"] };
+  }
+  const reasons = [];
+  let score = 0;
+  const sourceCheck = summary.source_check || summary.sourceCheck;
+  const reliability = summary.source_reliability || summary.sourceReliability;
+  const teamData = summary.team_data_check || summary.teamDataCheck;
+  const gaps = summary.information_gaps || summary.missing_sources || summary.informationGaps;
+
+  if (hasUsefulValue(sourceCheck)) {
+    score += 25;
+    reasons.push("有信息源校验结论 +25");
+    const text = valueText(sourceCheck, "").toLowerCase();
+    if (/通过|充足|完整|可靠|confirmed|sufficient|high/.test(text)) {
+      score += 15;
+      reasons.push("来源校验偏正向 +15");
+    } else if (/不足|缺失|failed|low|无|缺/.test(text)) {
+      score -= 8;
+      reasons.push("来源校验提示缺失 -8");
+    }
+  } else {
+    reasons.push("缺少 source_check +0");
+  }
+
+  if (hasUsefulValue(reliability)) {
+    score += 18;
+    reasons.push("有来源可靠性说明 +18");
+  }
+  if (hasUsefulValue(teamData)) {
+    score += 17;
+    reasons.push("有球队/球员数据校验 +17");
+  }
+  if (hasUsefulValue(gaps)) {
+    score += 10;
+    reasons.push("明确列出信息缺口 +10");
+  }
+  if (hasUsefulValue(summary.key_evidence || summary.evidence)) {
+    score += 15;
+    reasons.push("有关键证据链 +15");
+  }
+
+  return { score: Math.max(0, Math.min(100, Math.round(score))), reasons };
+}
+
+function matchBaseEvidenceScore(match) {
+  let score = 0;
+  const reasons = [];
+  if (match.id && String(match.id).startsWith("espn-")) {
+    score += 15;
+    reasons.push("ESPN 赛程事件确认 +15");
+  }
+  if (match.date && match.kickoffTime && match.group && match.venue) {
+    score += 20;
+    reasons.push("比赛时间/小组/场地完整 +20");
+  }
+  if (match.home && match.away) {
+    score += 10;
+    reasons.push("双方球队明确 +10");
+  }
+  if (match.status === "review" || match.score !== "未赛") {
+    score += 10;
+    reasons.push("已赛结果可用于复盘校验 +10");
+  }
+  if (match.factors) {
+    score += 15;
+    reasons.push("存在本地启发式因子 +15");
+  } else {
+    reasons.push("未接入阵容/战术/表现质量因子");
+  }
+  return { score: Math.max(0, Math.min(100, score)), reasons };
+}
+
+function scoreMatchEvidence(match) {
   const prediction = predictionFor(match);
   const summary = normalizePredictionSummary(prediction);
-  const predictedScore = summary?.analysis_score || summary?.score || summary?.confidence_score || prediction?.score;
-  if (predictedScore) return Math.max(20, Math.min(95, Math.round(Number(String(predictedScore).replace(/[^\d.]/g, "")) || 50)));
-  if (!match.factors) {
-    if (match.status === "review") return 55;
-    if (match.status === "watch") return 52;
-    if (match.status === "avoid") return 34;
-    return 42;
+  const modelAnalysisScore = numericPercent(summary?.analysis_score || summary?.score || prediction?.score);
+  const modelConfidence = numericPercent(summary?.confidence_score || summary?.confidence);
+  const base = matchBaseEvidenceScore(match);
+  const source = sourceCompletenessScore(summary);
+
+  if (prediction) {
+    const modelScore = modelAnalysisScore ?? Math.round((source.score * 0.65) + (base.score * 0.35));
+    const confidencePart = modelConfidence ?? modelScore;
+    const finalScore = Math.round(modelScore * 0.45 + source.score * 0.35 + base.score * 0.2);
+    return {
+      score: Math.max(0, Math.min(100, finalScore)),
+      sourceScore: source.score,
+      confidenceScore: Math.max(0, Math.min(100, Math.round(confidencePart))),
+      reasons: [
+        ...(modelAnalysisScore === null ? ["模型未给 analysis_score，使用来源/基础证据推算"] : [`模型可分析度 ${modelAnalysisScore}`]),
+        ...(modelConfidence === null ? ["模型未给 confidence_score"] : [`模型信心 ${modelConfidence}`]),
+        ...source.reasons,
+        ...base.reasons
+      ]
+    };
   }
-  const entries = Object.entries(match.factors);
-  const totalWeight = entries.reduce((sum, [key]) => sum + Math.abs(state.weights[key]), 0);
-  const weighted = entries.reduce((sum, [key, factor]) => sum + factorScore(factor) * state.weights[key], 0);
-  const uncertainty = factorScore(match.factors.uncertainty);
-  const uncertaintyPenalty = Math.max(0, uncertainty - 50) * 0.28;
-  const raw = weighted / totalWeight + 18 - uncertaintyPenalty;
-  return Math.max(20, Math.min(88, Math.round(raw)));
+
+  const entries = match.factors ? Object.entries(match.factors) : [];
+  if (entries.length) {
+    const totalWeight = entries.reduce((sum, [key]) => sum + Math.abs(state.weights[key]), 0);
+    const weighted = entries.reduce((sum, [key, factor]) => sum + factorScore(factor) * state.weights[key], 0);
+    const uncertainty = factorScore(match.factors.uncertainty);
+    const uncertaintyPenalty = Math.max(0, uncertainty - 50) * 0.28;
+    const raw = weighted / totalWeight + 18 - uncertaintyPenalty;
+    return {
+      score: Math.max(20, Math.min(88, Math.round(raw))),
+      sourceScore: 0,
+      confidenceScore: Math.max(20, Math.min(88, Math.round(raw))),
+      reasons: ["本地启发式因子加权", `不确定性惩罚 ${Math.round(uncertaintyPenalty)}`, ...base.reasons]
+    };
+  }
+
+  return {
+    score: base.score,
+    sourceScore: 0,
+    confidenceScore: base.score,
+    reasons: base.reasons
+  };
+}
+
+function normalizedAnalysisScore(match) {
+  return scoreMatchEvidence(match).score;
 }
 
 function isFutureMatch(match) {
@@ -520,7 +639,7 @@ function renderMatchList() {
     .map((match) => {
       const active = match.id === state.selectedId ? " active" : "";
       const prediction = predictionFor(match);
-      const analysisScore = normalizedAnalysisScore(match);
+      const evidenceScore = scoreMatchEvidence(match);
       return `
         <button class="match-card${active}" data-match-id="${match.id}" type="button">
           <div class="match-card-top">
@@ -534,7 +653,7 @@ function renderMatchList() {
           </div>
           <div class="mini-score">
             <span>${match.kickoffTime || "可分析度"}</span>
-            <strong>${prediction ? "已预测" : "未预测"} · ${analysisScore}分</strong>
+            <strong>${prediction ? "已预测" : "未预测"} · 可分析 ${evidenceScore.score}分</strong>
           </div>
         </button>
       `;
@@ -676,18 +795,55 @@ function renderEntertainmentTop3(items) {
   `;
 }
 
+function renderBranches(branches) {
+  const list = Array.isArray(branches)
+    ? branches
+    : Object.entries(branches || {}).map(([name, value]) => ({ name, ...((typeof value === "object" && value) || { text: value }) }));
+  if (!list.length) return `<div class="empty-state">模型未给出三分支推演。</div>`;
+  return `
+    <div class="branch-grid">
+      ${list.slice(0, 3).map((item, index) => `
+        <div class="branch-card">
+          <span>${valueText(item.name || item.type || ["常规分支", "打穿分支", "钝化/冷门分支"][index])}</span>
+          <strong>${valueText(item.score || item.score_range || item.scoreRange || item.result, "比分区间未给出")}</strong>
+          <p>${valueText(item.trigger || item.condition || item.text, "触发条件未给出")}</p>
+          <p>${valueText(item.direction || item.bet_direction || item.probability || item.level, "方向/概率未给出")}</p>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function actualWinner(match) {
+  if (!match.score || match.score === "未赛" || !/^\d+-\d+$/.test(match.score)) return "";
+  const [homeScore, awayScore] = match.score.split("-").map(Number);
+  if (homeScore > awayScore) return match.home;
+  if (awayScore > homeScore) return match.away;
+  return "平局";
+}
+
+function simpleDirectionHit(match, summary) {
+  const actual = actualWinner(match);
+  if (!actual) return null;
+  const text = valueText(summary.winner || summary.win_tendency || summary.full_time || summary.fullTime, "");
+  if (!text) return { hit: false, note: "模型未给胜平负方向" };
+  if (actual === "平局") return { hit: /平|draw/i.test(text), note: `真实结果：${actual}` };
+  return { hit: text.includes(actual), note: `真实结果：${actual}` };
+}
+
 function renderPredictionSummary(prediction) {
   const summary = normalizePredictionSummary(prediction);
+  const match = getSelectedMatch();
+  const scoreDetail = scoreMatchEvidence(getSelectedMatch());
   const sourceCheck = summary.source_check || summary.sourceCheck || {};
   const winner = summary.winner || summary.win_tendency || summary.full_time?.winner || summary.full_time?.tendency;
   const confidence = summary.confidence || summary.confidence_score || summary.source_reliability?.confidence || "模型未给出明确信心程度";
-  const analysisScore = summary.analysis_score || summary.score || summary.evidence_score || normalizedAnalysisScore(getSelectedMatch());
   return `
     <div class="prediction-summary-grid">
       <article class="result-card accent">
         <span>胜负倾向</span>
         <strong>${valueText(winner, "模型未给出明确胜负倾向")}</strong>
-        <p><b class="score-chip">信心 ${percentText(confidence)}</b><b class="score-chip muted">可分析度 ${percentText(analysisScore)}</b></p>
+        <p><b class="score-chip">信心 ${scoreDetail.confidenceScore}%</b><b class="score-chip muted">可分析度 ${scoreDetail.score}%</b></p>
       </article>
       <article class="result-card">
         <span>是否可分析</span>
@@ -696,13 +852,40 @@ function renderPredictionSummary(prediction) {
       </article>
       <article class="result-card">
         <span>信息源校验</span>
-        <strong>${valueText(sourceCheck.status || sourceCheck.result, "已纳入校验")}</strong>
+        <strong>${scoreDetail.sourceScore}%</strong>
         <p>${valueText(sourceCheck.summary || summary.source_reliability, "模型未给出来源摘要")}</p>
       </article>
     </div>
     <div class="prediction-section">
+      <h3>评分依据</h3>
+      <p>${scoreDetail.reasons.slice(0, 8).map((item) => `• ${item}`).join("<br>")}</p>
+    </div>
+    ${match.status === "review" ? (() => {
+      const hit = simpleDirectionHit(match, summary);
+      return `<div class="prediction-section">
+        <h3>第一轮/已赛样本校验</h3>
+        <p>${hit ? `${hit.hit ? "方向命中" : "方向未命中"}；${hit.note}` : "未赛或比分不可解析，暂不能校验。"}</p>
+      </div>`;
+    })() : ""}
+    <div class="prediction-section">
       <h3>上半场可能走势</h3>
       <p>${valueText(summary.first_half || summary.firstHalf)}</p>
+    </div>
+    <div class="prediction-section">
+      <h3>技战术画像</h3>
+      <p>${valueText(summary.tactical_profile || summary.tacticalProfile, "模型未单独给出技战术画像。")}</p>
+    </div>
+    <div class="prediction-section">
+      <h3>关键球员功能</h3>
+      <p>${valueText(summary.player_functions || summary.playerFunctions, "模型未单独给出球员功能拆解。")}</p>
+    </div>
+    <div class="prediction-section">
+      <h3>双方对位</h3>
+      <p>${valueText(summary.matchup || summary.matchup_analysis || summary.matchupAnalysis, "模型未单独给出对位分析。")}</p>
+    </div>
+    <div class="prediction-section">
+      <h3>三分支推演</h3>
+      ${renderBranches(summary.branches || summary.match_branches || summary.scenarios)}
     </div>
     <div class="prediction-section">
       <h3>全场可能走势</h3>
@@ -715,6 +898,10 @@ function renderPredictionSummary(prediction) {
     <div class="prediction-section">
       <h3>球队数据校验</h3>
       <p>${valueText(summary.team_data_check, "模型未单独给出球队数据校验。")}</p>
+    </div>
+    <div class="prediction-section">
+      <h3>盘口验证</h3>
+      <p>${valueText(summary.market_check || summary.marketCheck, "模型未单独给出盘口验证。")}</p>
     </div>
     <div class="prediction-section">
       <h3>娱乐参考前三项</h3>

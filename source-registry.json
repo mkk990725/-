@@ -162,6 +162,30 @@
       "name": "YouTube 发布会",
       "tier": "media_live",
       "query": "site:youtube.com \"press conference\" \"{team}\" \"World Cup\""
+    },
+    {
+      "id": "zhanglu-migu-cctv",
+      "name": "张路观点：咪咕/央视/央视频",
+      "tier": "cn_context",
+      "query": "(site:miguvideo.com OR site:yangshipin.cn OR site:cctv.com) \"张路\" \"{teamA}\" \"{teamB}\""
+    },
+    {
+      "id": "zhanglu-zhanjun-platforms",
+      "name": "张路观点：詹俊张路组合节目",
+      "tier": "cn_context",
+      "query": "\"詹俊\" \"张路\" \"{teamA}\" \"{teamB}\""
+    },
+    {
+      "id": "zhanglu-sports-portals",
+      "name": "张路观点：腾讯/直播吧/懂球帝/门户",
+      "tier": "cn_context",
+      "query": "(site:sports.qq.com OR site:zhibo8.com OR site:dongqiudi.com OR site:sports.sina.com.cn OR site:sports.sohu.com) \"张路\" \"{teamA}\" \"{teamB}\""
+    },
+    {
+      "id": "zhanglu-video-clips",
+      "name": "张路观点：B站/微博/视频切片",
+      "tier": "cn_context",
+      "query": "(site:bilibili.com OR site:weibo.com) \"张路\" \"{teamA}\" \"{teamB}\""
     }
   ],
   "officialFaDomains": {

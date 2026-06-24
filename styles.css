@@ -562,7 +562,8 @@ h1 {
 }
 
 .prediction-summary-grid,
-.entertainment-grid {
+.entertainment-grid,
+.branch-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
@@ -570,7 +571,8 @@ h1 {
 }
 
 .result-card,
-.mini-prediction-card {
+.mini-prediction-card,
+.branch-card {
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -583,7 +585,8 @@ h1 {
 }
 
 .result-card span,
-.mini-prediction-card span {
+.mini-prediction-card span,
+.branch-card span {
   display: block;
   margin-bottom: 8px;
   color: var(--subtle);
@@ -592,7 +595,8 @@ h1 {
 }
 
 .result-card strong,
-.mini-prediction-card strong {
+.mini-prediction-card strong,
+.branch-card strong {
   display: block;
   margin-bottom: 8px;
   color: var(--ink);
@@ -601,6 +605,7 @@ h1 {
 
 .result-card p,
 .mini-prediction-card p,
+.branch-card p,
 .prediction-section p {
   margin: 0;
   color: var(--subtle);
