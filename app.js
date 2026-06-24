@@ -887,6 +887,23 @@ function valueText(value, fallback = "待模型给出") {
   return polishText(value);
 }
 
+function readableItems(value, fallback = "待模型给出", limit = 5) {
+  const text = valueText(value, fallback);
+  if (!text || text === fallback) return [fallback];
+  return text
+    .replace(/<br\s*\/?>/gi, "\n")
+    .split(/\n|；|。|(?<=\d)[.)、]\s+|[•·]\s*/g)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
+function renderReadableList(value, fallback = "待模型给出", limit = 5) {
+  return `<ol class="readable-list">${readableItems(value, fallback, limit)
+    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .join("")}</ol>`;
+}
+
 function parseJsonObject(text) {
   const raw = String(text || "").trim();
   if (!raw) return null;
@@ -924,6 +941,37 @@ function percentText(value, fallback = "未给出") {
   const num = Number(raw.replace(/[^\d.]/g, ""));
   if (!Number.isFinite(num)) return raw;
   return `${Math.round(Math.max(0, Math.min(100, num)))}%`;
+}
+
+function confidenceNumber(...values) {
+  for (const value of values) {
+    const num = numericPercent(value);
+    if (num !== null) return Math.round(num);
+  }
+  return 0;
+}
+
+function heatStyle(confidence) {
+  const value = Math.max(0, Math.min(100, Number(confidence) || 0));
+  const alpha = value <= 25 ? 0 : (value / 100) * 0.28;
+  return `--heat-alpha:${alpha.toFixed(3)};--heat-width:${value}%;`;
+}
+
+function renderHeatCard({ title, value, confidence, detail, accent = false, wide = false }) {
+  const resultText = valueText(value, "模型未给出明确结果");
+  const hasResult = !/未明确|未给出|待模型|待补充/.test(resultText);
+  const finalConfidence = hasResult ? Math.max(0, Math.min(100, Number(confidence) || 0)) : 0;
+  return `
+    <article class="result-card heat-card${accent ? " accent" : ""}${wide ? " wide" : ""}" style="${heatStyle(finalConfidence)}">
+      <span>${escapeHtml(title)}</span>
+      <strong>${escapeHtml(resultText)}</strong>
+      <div class="heat-meta">
+        <b>信心 ${finalConfidence}%</b>
+        <i aria-hidden="true"></i>
+      </div>
+      ${renderReadableList(detail || value, "模型未给出补充解释。", wide ? 5 : 3)}
+    </article>
+  `;
 }
 
 function summaryText(value, fallback = "模型未给出") {
@@ -994,33 +1042,47 @@ function renderPredictionSummary(prediction) {
   const goals = valueText(summary.total_goals || summary.goals || summary.goal_line || summary.over_under || summary.market_check?.total_goals, "未明确");
   const halfFull = valueText(summary.half_full || summary.halfFull || summary.ht_ft || summary.entertainment_top3?.[0]?.half_full || summary.entertainmentTop3?.[0]?.halfFull, "未明确");
   const scorePick = valueText(summary.score || summary.score_range || summary.scoreRange || summary.entertainment_top3?.[0]?.score || summary.entertainmentTop3?.[0]?.score, "未明确");
+  const baseConfidence = confidenceNumber(confidence, scoreDetail.confidenceScore);
+  const winnerConfidence = confidenceNumber(summary.winner_confidence, summary.win_confidence, confidence, baseConfidence);
+  const goalsConfidence = confidenceNumber(summary.goals_confidence, summary.total_goals_confidence, summary.over_under_confidence, baseConfidence);
+  const scoreConfidence = confidenceNumber(summary.score_confidence, summary.score_range_confidence, summary.entertainment_top3?.[0]?.confidence, baseConfidence);
+  const halfFullConfidence = confidenceNumber(summary.half_full_confidence, summary.ht_ft_confidence, summary.first_half_confidence, baseConfidence);
   return `
     <section class="prediction-brief">
       <span>整场局势预测分析</span>
-      <strong>${situation}</strong>
-      <p><b>上半场：</b>${firstHalf}</p>
+      ${renderReadableList(situation, "模型未给出整场局势摘要。", 4)}
+      <div class="half-summary">
+        <b>上半场</b>
+        ${renderReadableList(firstHalf, "上半场走势待补充。", 4)}
+      </div>
     </section>
     <div class="prediction-summary-grid">
-      <article class="result-card accent">
-        <span>胜平负</span>
-        <strong>${valueText(winner, "模型未给出明确胜负倾向")}</strong>
-        <p><b class="score-chip">信心 ${percentText(confidence, `${scoreDetail.confidenceScore}%`)}</b></p>
-      </article>
-      <article class="result-card">
-        <span>进球数</span>
-        <strong>${goals}</strong>
-        <p>只展示模型给出的真实判断，不展示硬编码评分。</p>
-      </article>
-      <article class="result-card">
-        <span>比分</span>
-        <strong>${scorePick}</strong>
-        <p>娱乐参考，不作为投资建议</p>
-      </article>
-      <article class="result-card wide">
-        <span>半全场</span>
-        <strong>${halfFull}</strong>
-        <p>${firstHalf}</p>
-      </article>
+      ${renderHeatCard({
+        title: "胜平负",
+        value: winner,
+        confidence: winnerConfidence,
+        detail: summary.winner_reason || summary.win_reason || summary.full_time || situation,
+        accent: true
+      })}
+      ${renderHeatCard({
+        title: "进球数",
+        value: goals,
+        confidence: goalsConfidence,
+        detail: summary.total_goals_reason || summary.goal_reason || summary.over_under_reason || goals
+      })}
+      ${renderHeatCard({
+        title: "比分",
+        value: scorePick,
+        confidence: scoreConfidence,
+        detail: "娱乐参考，不作为投资建议。信心低时仅保留为弱提示。"
+      })}
+      ${renderHeatCard({
+        title: "半全场",
+        value: halfFull,
+        confidence: halfFullConfidence,
+        detail: firstHalf,
+        wide: true
+      })}
     </div>
   `;
 }
@@ -1039,10 +1101,11 @@ function renderTacticalProfile(match) {
   if (!el.tacticalProfilePanel) return;
   const prediction = predictionFor(match);
   const summary = prediction ? normalizePredictionSummary(prediction) : {};
+  const homeProfile = window.TEAM_PROFILES?.[match.home] || {};
+  const awayProfile = window.TEAM_PROFILES?.[match.away] || {};
   el.tacticalProfilePanel.innerHTML = `
     <div class="section-head compact">
       <div>
-        <span class="muted-label">独立模块</span>
         <h2>技战术画像</h2>
       </div>
       <a class="tag link-tag" href="teams.html?match=${encodeURIComponent(match.id)}">查看球队资料</a>
@@ -1050,18 +1113,49 @@ function renderTacticalProfile(match) {
     <div class="tactical-clean-grid">
       <article>
         <span>球队技战术</span>
-        <p>${valueText(summary.tactical_profile || summary.tacticalProfile, "暂无模型生成的技战术画像。")}</p>
+        ${renderReadableList(summary.tactical_profile || summary.tacticalProfile, "暂无模型生成的技战术画像。", 5)}
       </article>
       <article>
         <span>关键球员功能</span>
-        <p>${valueText(summary.player_functions || summary.playerFunctions, "暂无模型生成的球员功能拆解。")}</p>
+        ${renderReadableList(summary.player_functions || summary.playerFunctions, "暂无模型生成的球员功能拆解。", 5)}
       </article>
       <article>
         <span>双方对位</span>
-        <p>${valueText(summary.matchup || summary.matchup_analysis || summary.matchupAnalysis, "暂无模型生成的双方对位分析。")}</p>
+        ${renderReadableList(summary.matchup || summary.matchup_analysis || summary.matchupAnalysis, "暂无模型生成的双方对位分析。", 5)}
+      </article>
+      <article>
+        <span>${escapeHtml(match.home)} 主教练</span>
+        <strong>${escapeHtml(homeProfile.coach || "待补充")}</strong>
+        ${renderReadableList(homeProfile.coachStyle || homeProfile.coach_style || homeProfile.summary, "暂无主教练执教信息和战术风格。", 4)}
+      </article>
+      <article>
+        <span>${escapeHtml(match.away)} 主教练</span>
+        <strong>${escapeHtml(awayProfile.coach || "待补充")}</strong>
+        ${renderReadableList(awayProfile.coachStyle || awayProfile.coach_style || awayProfile.summary, "暂无主教练执教信息和战术风格。", 4)}
       </article>
     </div>
   `;
+}
+
+function showAppToast({ title, message, type = "success", duration = 3000 }) {
+  document.querySelectorAll(".config-toast").forEach((item) => item.remove());
+  const toast = document.createElement("div");
+  toast.className = `config-toast ${type}`;
+  toast.style.setProperty("--toast-duration", `${duration}ms`);
+  toast.innerHTML = `
+    <div class="config-toast-icon">${type === "error" ? "!" : "✓"}</div>
+    <div class="config-toast-body">
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(message)}</p>
+      <span class="config-toast-progress"></span>
+    </div>
+  `;
+  document.body.appendChild(toast);
+  window.setTimeout(() => toast.classList.add("visible"), 20);
+  window.setTimeout(() => {
+    toast.classList.remove("visible");
+    window.setTimeout(() => toast.remove(), 260);
+  }, duration);
 }
 
 function renderPrematchInfo(info) {
@@ -1138,12 +1232,22 @@ async function updatePrematchInfoForSelectedMatch() {
     const info = await response.json();
     state.prematchInfoByMatch[match.id] = info;
     renderPrematchInfo(info);
+    showAppToast({
+      title: info.changed ? "赛前信息已更新" : "目前是最新消息",
+      message: info.summary || "已完成赛前信息源检查。"
+    });
   } catch (error) {
     el.prematchPanel.innerHTML = `
       <div class="empty-state">
         赛前信息更新失败：${escapeHtml(error.message)}。如果是 HTTP 404，说明当前后端进程仍是旧版本，需要重启服务。
       </div>
     `;
+    showAppToast({
+      title: "赛前信息更新失败",
+      message: error.message,
+      type: "error",
+      duration: 4500
+    });
   } finally {
     if (el.prematchUpdate) {
       el.prematchUpdate.disabled = false;

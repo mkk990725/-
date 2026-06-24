@@ -865,6 +865,37 @@ summary:focus-visible {
   line-height: 1.55;
 }
 
+.readable-list {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--subtle);
+  line-height: 1.62;
+}
+
+.readable-list li {
+  padding-left: 2px;
+  overflow-wrap: anywhere;
+}
+
+.prediction-brief .readable-list {
+  margin-top: 8px;
+  color: var(--ink);
+}
+
+.half-summary {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.half-summary b {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--blue);
+}
+
 .result-card,
 .mini-prediction-card,
 .branch-card {
@@ -891,6 +922,38 @@ summary:focus-visible {
 .result-card.accent {
   border-color: #b9cef8;
   background: #f8fbff;
+}
+
+.result-card.heat-card {
+  position: relative;
+  border-color: rgba(196, 81, 0, calc(0.12 + var(--heat-alpha, 0)));
+  background:
+    linear-gradient(180deg, rgba(196, 81, 0, var(--heat-alpha, 0)), rgba(196, 81, 0, calc(var(--heat-alpha, 0) * 0.45))),
+    #fff;
+}
+
+.result-card.heat-card.accent {
+  border-color: rgba(196, 81, 0, calc(0.2 + var(--heat-alpha, 0)));
+}
+
+.heat-meta {
+  display: grid;
+  gap: 7px;
+  margin: 8px 0 10px;
+}
+
+.heat-meta b {
+  color: #9c3f00;
+  font-size: 12px;
+}
+
+.heat-meta i {
+  display: block;
+  height: 7px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, #c45100 var(--heat-width, 0%), rgba(196, 81, 0, 0.1) var(--heat-width, 0%));
+  box-shadow: inset 0 0 0 1px rgba(196, 81, 0, 0.1);
 }
 
 .result-card span,
@@ -2148,7 +2211,26 @@ summary:focus-visible {
   height: 3px;
   background: #22c55e;
   transform-origin: left center;
-  animation: toast-progress 3s linear forwards;
+  animation: toast-progress var(--toast-duration, 3000ms) linear forwards;
+}
+
+.config-toast.error {
+  color: #7f1d1d;
+  border-color: #fecaca;
+  background: #fef2f2;
+  box-shadow: 0 24px 70px -42px rgba(127, 29, 29, 0.72);
+}
+
+.config-toast.error .config-toast-icon {
+  background: #dc2626;
+}
+
+.config-toast.error .config-toast-body p {
+  color: #991b1b;
+}
+
+.config-toast.error .config-toast-progress {
+  background: #ef4444;
 }
 
 @keyframes toast-progress {

@@ -870,9 +870,11 @@ async function callChatCompletions(config, messages, temperature = config.model?
   });
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(`LLM HTTP ${response.status}${body ? `: ${body.slice(0, 240)}` : ""}`);
+    throw new Error(`LLM HTTP ${response.status} @ ${endpoint}${body ? `: ${body.slice(0, 240)}` : ""}`);
   }
-  return response.json();
+  const payload = await response.json();
+  payload.__endpoint = endpoint;
+  return payload;
 }
 
 async function translateMissingPlayerNames(names) {
@@ -1243,6 +1245,7 @@ async function testModelConnection(config) {
   return {
     ok: true,
     model: modelSettings(config).model,
+    endpoint: payload.__endpoint || normalizeChatCompletionsUrl(modelSettings(config).apiUrl),
     elapsedMs: Date.now() - startedAt,
     responsePreview: extractAssistantText(payload).slice(0, 200)
   };

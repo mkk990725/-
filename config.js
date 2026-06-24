@@ -158,8 +158,9 @@ function showConfigToast({ title, message, type = "success", duration = 3000 }) 
   document.querySelectorAll(".config-toast").forEach((item) => item.remove());
   const toast = document.createElement("div");
   toast.className = `config-toast ${type}`;
+  toast.style.setProperty("--toast-duration", `${duration}ms`);
   toast.innerHTML = `
-    <div class="config-toast-icon">✓</div>
+    <div class="config-toast-icon">${type === "error" ? "!" : "✓"}</div>
     <div class="config-toast-body">
       <strong>${escapeHtml(title)}</strong>
       <p>${escapeHtml(message)}</p>
@@ -226,6 +227,12 @@ document.getElementById("testModel").addEventListener("click", async () => {
     });
   } catch (error) {
     status.textContent = `联通失败：${error.message}`;
+    showConfigToast({
+      title: "模型联通失败",
+      message: error.message,
+      type: "error",
+      duration: 5000
+    });
   } finally {
     button.disabled = false;
   }
