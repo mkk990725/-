@@ -12,6 +12,7 @@ const SQUAD_DIR = path.join(CACHE_DIR, "squads");
 const PLAYER_DIR = path.join(CACHE_DIR, "players");
 const TRANSLATION_CACHE = path.join(CACHE_DIR, "player-name-translations.json");
 const TEAM_CACHE = path.join(CACHE_DIR, "teams.json");
+const PREMATCH_INFO_CACHE = path.join(CACHE_DIR, "prematch-info.json");
 const MODEL_CONFIG = path.join(__dirname, "model-config.json");
 const MODEL_CONFIG_EXAMPLE = path.join(__dirname, "model-config.example.json");
 const SOURCE_REGISTRY = path.join(__dirname, "source-registry.json");
@@ -19,6 +20,7 @@ const DB_FILE = path.join(__dirname, "football-agent.db");
 const PREMATCH_SKILL = path.join(__dirname, "agent-skills", "prematch-analysis.md");
 const LEARNING_SKILL = path.join(__dirname, "agent-skills", "learning-failures.md");
 const PREDICTION_CACHE = path.join(CACHE_DIR, "predictions.json");
+const predictionJobs = new Map();
 const SQUAD_TTL_MS = Number(process.env.SQUAD_TTL_HOURS || 12) * 60 * 60 * 1000;
 const PLAYER_TTL_MS = Number(process.env.PLAYER_TTL_HOURS || 48) * 60 * 60 * 1000;
 const STATIC_TYPES = {
@@ -417,6 +419,127 @@ async function sourceCheckForMatch(matchLike) {
     searchQueries,
     sourceTiers: registry.sourceTiers || []
   };
+}
+
+function parseBeijingKickoff(match) {
+  const text = `${match?.kickoffTime || ""}`;
+  const m = text.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}):(\d{2})/);
+  if (!m) return null;
+  return new Date(`${m[1]}T${m[2]}:${m[3]}:00+08:00`);
+}
+
+function prematchPhase(match) {
+  const kickoff = parseBeijingKickoff(match);
+  if (!kickoff) return {
+    id: "unknown",
+    label: "赛前信息检查",
+    focus: ["赛程时间不完整，先检查通用赛前新闻、官方消息和直播页"]
+  };
+  const hours = (kickoff.getTime() - Date.now()) / 36e5;
+  if (hours <= 1.25 && hours >= -0.25) return {
+    id: "lineup",
+    label: "开赛前 60-75 分钟",
+    focus: ["官方首发", "中锋/后腰/边后卫功能", "核心轮休", "阵型变化", "热身伤退"]
+  };
+  if (hours <= 6 && hours >= 1.25) return {
+    id: "live-build",
+    label: "开赛前 3-6 小时",
+    focus: ["Reuters team news", "国家队官方账号", "当地记者", "Guardian/BBC/Sky live page"]
+  };
+  return {
+    id: "day-before",
+    label: "开赛前 24 小时",
+    focus: ["Reuters", "AP", "FIFA", "Guardian", "伤停与发布会", "预计首发变化"]
+  };
+}
+
+function prematchSearchSources(match) {
+  const home = match?.home || "";
+  const away = match?.away || "";
+  const q = encodeURIComponent(`"${home}" "${away}" World Cup team news lineups`);
+  const loose = encodeURIComponent(`${home} ${away} World Cup team news lineups`);
+  return [
+    { id: "reuters-team-news", name: "Reuters team news", tier: "权威媒体", url: `https://www.reuters.com/site-search/?query=${loose}`, keywords: ["team news", "injury", "lineup", home, away] },
+    { id: "ap-team-news", name: "AP team news", tier: "权威媒体", url: `https://apnews.com/search?q=${loose}`, keywords: ["injury", "lineup", home, away] },
+    { id: "guardian-live", name: "Guardian live / minute-by-minute", tier: "直播/赛前页", url: `https://www.theguardian.com/football/live`, keywords: ["live", home, away] },
+    { id: "guardian-search", name: "Guardian match search", tier: "直播/赛前页", url: `https://www.theguardian.com/football/search?q=${loose}`, keywords: [home, away, "team news", "live"] },
+    { id: "bbc-search", name: "BBC Sport search", tier: "二次确认", url: `https://www.bbc.co.uk/search?q=${loose}`, keywords: [home, away, "line-ups", "team news"] },
+    { id: "sky-search", name: "Sky Sports search", tier: "二次确认", url: `https://www.skysports.com/search?q=${loose}`, keywords: [home, away, "team news", "lineups"] },
+    { id: "espn-soccer", name: "ESPN Soccer", tier: "二次确认", url: `https://www.espn.com/soccer/`, keywords: [home, away, "lineups"] },
+    { id: "theanalyst-search", name: "The Analyst / Opta", tier: "结构化数据", url: `https://theanalyst.com/?s=${q}`, keywords: [home, away, "preview", "stats"] },
+    { id: "fifa-match-centre", name: "FIFA Match Centre", tier: "官方源", url: "https://www.fifa.com/en/match-centre", keywords: [home, away, "lineup"] },
+    { id: "fifa-live", name: "FIFA Live", tier: "官方源", url: "https://www.fifa.com/live", keywords: [home, away] },
+    { id: "x-starting-xi", name: "两队官方 X / 赛事官方社媒", tier: "官方社媒", url: `https://x.com/search?q=${encodeURIComponent(`"Starting XI" "${home}" OR "${away}"`)}`, manual: true },
+    { id: "instagram-starting-xi", name: "两队官方 Instagram", tier: "官方社媒", url: `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(`${home} ${away} Starting XI`)}`, manual: true }
+  ];
+}
+
+async function fetchSourcePreview(source) {
+  if (source.manual) return { ...source, status: "manual", title: "", matchedKeywords: [], note: "社媒/动态页需要浏览器或平台适配，已提供核验入口。" };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6500);
+  try {
+    const response = await fetch(source.url, {
+      signal: controller.signal,
+      headers: { "user-agent": "football-analysis-agent/0.1; prematch-source-check" }
+    });
+    const html = await response.text();
+    const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/\s+/g, " ").trim() || "";
+    const sample = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 3000);
+    const lower = sample.toLowerCase();
+    const matchedKeywords = (source.keywords || []).filter((kw) => kw && lower.includes(String(kw).toLowerCase()));
+    return {
+      ...source,
+      status: response.ok ? "checked" : "unavailable",
+      httpStatus: response.status,
+      title,
+      matchedKeywords,
+      note: matchedKeywords.length ? `命中关键词：${matchedKeywords.join("、")}` : "页面可访问，但未识别到本场明确更新。"
+    };
+  } catch (error) {
+    return { ...source, status: "unavailable", title: "", matchedKeywords: [], note: `抓取失败：${error.message}` };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function prematchCacheKey(match) {
+  return matchPredictionKey(match);
+}
+
+async function updatePrematchInfo(match) {
+  const phase = prematchPhase(match);
+  const sources = prematchSearchSources(match);
+  const items = await Promise.all(sources.map(fetchSourcePreview));
+  const cache = fs.existsSync(PREMATCH_INFO_CACHE) ? JSON.parse(fs.readFileSync(PREMATCH_INFO_CACHE, "utf8")) : {};
+  const key = prematchCacheKey(match);
+  const signature = JSON.stringify(items.map((item) => ({
+    id: item.id,
+    status: item.status,
+    title: item.title,
+    note: item.note,
+    matchedKeywords: item.matchedKeywords
+  })));
+  const previous = cache[key]?.signature || "";
+  const changed = signature !== previous;
+  const found = items.filter((item) => item.matchedKeywords?.length);
+  const manual = items.filter((item) => item.status === "manual");
+  const unavailable = items.filter((item) => item.status === "unavailable");
+  const summary = changed
+    ? `赛前信息已更新：${found.length} 个来源命中关键词，${manual.length} 个官方/社媒入口待人工或浏览器适配核验，${unavailable.length} 个来源暂不可抓取。`
+    : "没有发现相比上次点击的新摘要，已重新检查各信息源。";
+  const payload = {
+    checkedAt: new Date().toISOString(),
+    match,
+    phase,
+    changed,
+    summary,
+    focus: phase.focus,
+    items
+  };
+  cache[key] = { signature, payload };
+  fs.writeFileSync(PREMATCH_INFO_CACHE, JSON.stringify(cache, null, 2));
+  return payload;
 }
 
 function eventToMatch(event) {
@@ -1111,6 +1234,60 @@ function matchPredictionKey(match) {
   return match?.id || `${match?.date || ""}|${match?.home || ""}|${match?.away || ""}`;
 }
 
+function createPredictionJob(match) {
+  const id = `job-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const now = new Date().toISOString();
+  const job = {
+    id,
+    matchKey: matchPredictionKey(match),
+    match,
+    status: "queued",
+    progress: 0,
+    logs: [{ at: now, text: "任务已进入后台队列" }],
+    createdAt: now,
+    updatedAt: now,
+    result: null,
+    error: ""
+  };
+  predictionJobs.set(id, job);
+  setImmediate(async () => {
+    try {
+      job.status = "running";
+      job.progress = 15;
+      job.updatedAt = new Date().toISOString();
+      job.logs.push({ at: job.updatedAt, text: "正在搜集球队、球员与信息源完整度输入" });
+      const result = await predictMatch(match);
+      job.status = "completed";
+      job.progress = 100;
+      job.result = result;
+      job.updatedAt = new Date().toISOString();
+      job.logs.push({ at: job.updatedAt, text: "预测完成，已写入本地预测库" });
+    } catch (error) {
+      job.status = "failed";
+      job.progress = 100;
+      job.error = error.message;
+      job.updatedAt = new Date().toISOString();
+      job.logs.push({ at: job.updatedAt, text: `任务失败：${error.message}` });
+    }
+  });
+  return job;
+}
+
+function compactPredictionJob(job) {
+  if (!job) return null;
+  return {
+    id: job.id,
+    matchKey: job.matchKey,
+    status: job.status,
+    progress: job.progress,
+    logs: job.logs.slice(-20),
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+    result: job.result,
+    error: job.error
+  };
+}
+
 async function predictMatch(match) {
   const config = readModelConfig();
   const result = await evaluateWithModel(match, config);
@@ -1278,6 +1455,13 @@ async function handleApi(req, res, url) {
     return jsonResponse(res, 200, await sourceCheckForMatch({ teamA, teamB, start, end }));
   }
 
+  if (url.pathname === "/api/prematch-update") {
+    if (req.method !== "POST") return jsonResponse(res, 405, { error: "POST required" });
+    const body = await readRequestBody(req);
+    if (!body.match) return jsonResponse(res, 400, { error: "Missing match" });
+    return jsonResponse(res, 200, await updatePrematchInfo(body.match));
+  }
+
   if (url.pathname === "/api/scoreboard") {
     const dateKey = url.searchParams.get("dates");
     if (!dateKey) return jsonResponse(res, 400, { error: "Missing dates=YYYYMMDD" });
@@ -1335,6 +1519,19 @@ async function handleApi(req, res, url) {
     if (req.method !== "POST") return jsonResponse(res, 405, { error: "POST required" });
     const body = await readRequestBody(req);
     return jsonResponse(res, 200, await predictMatch(body.match));
+  }
+
+  if (url.pathname === "/api/predict-task") {
+    if (req.method === "POST") {
+      const body = await readRequestBody(req);
+      if (!body.match) return jsonResponse(res, 400, { error: "Missing match" });
+      return jsonResponse(res, 202, compactPredictionJob(createPredictionJob(body.match)));
+    }
+    const id = url.searchParams.get("id");
+    if (!id) return jsonResponse(res, 400, { error: "Missing id" });
+    const job = compactPredictionJob(predictionJobs.get(id));
+    if (!job) return jsonResponse(res, 404, { error: "Unknown job" });
+    return jsonResponse(res, 200, job);
   }
 
   if (url.pathname === "/api/codex-analysis-package") {

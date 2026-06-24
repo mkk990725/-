@@ -106,6 +106,53 @@
       "name": "FIFA 2026 World Cup 官方赛程/赛果",
       "tier": "official_fact",
       "url": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums"
+    },
+    {
+      "id": "reuters-football-search",
+      "name": "Reuters football / team news search",
+      "tier": "media_live",
+      "url": "https://www.reuters.com/site-search/"
+    },
+    {
+      "id": "ap-news-search",
+      "name": "AP News football / team news search",
+      "tier": "media_live",
+      "url": "https://apnews.com/search"
+    },
+    {
+      "id": "bbc-sport-search",
+      "name": "BBC Sport lineups / live search",
+      "tier": "media_live",
+      "url": "https://www.bbc.co.uk/search"
+    },
+    {
+      "id": "sky-sports-search",
+      "name": "Sky Sports lineups / live search",
+      "tier": "media_live",
+      "url": "https://www.skysports.com/search"
+    },
+    {
+      "id": "espn-soccer",
+      "name": "ESPN Soccer lineups / match centre",
+      "tier": "structured_data",
+      "url": "https://www.espn.com/soccer/"
+    }
+  ],
+  "prematchUpdateRules": [
+    {
+      "window": "开赛前 24 小时",
+      "sources": ["Reuters", "AP", "FIFA", "Guardian"],
+      "focus": ["team news", "伤停", "发布会", "预计首发", "战术新闻"]
+    },
+    {
+      "window": "开赛前 3-6 小时",
+      "sources": ["Reuters team news", "国家队官方账号", "当地记者", "Guardian/BBC/Sky live page"],
+      "focus": ["team news 更新", "官方社媒", "当地记者", "直播页是否开启"]
+    },
+    {
+      "window": "开赛前 60-75 分钟",
+      "sources": ["FIFA Match Centre / FIFA App", "两队官方社媒", "赛事官方社媒", "ESPN/BBC/Sky/Guardian lineups"],
+      "focus": ["意外首发", "中锋", "后腰", "进攻型边后卫", "核心轮休", "阵型变化", "热身伤退"]
     }
   ],
   "searchTemplates": [

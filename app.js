@@ -779,6 +779,12 @@ function percentText(value, fallback = "未给出") {
   return `${Math.round(Math.max(0, Math.min(100, num)))}%`;
 }
 
+function summaryText(value, fallback = "模型未给出") {
+  const text = valueText(value, fallback);
+  if (text === fallback) return text;
+  return text.length > 140 ? `${text.slice(0, 140)}...` : text;
+}
+
 function renderEntertainmentTop3(items) {
   const list = Array.isArray(items) ? items.slice(0, 3) : [];
   if (!list.length) return `<div class="empty-state">模型没有给出娱乐比分前三项。</div>`;
@@ -838,22 +844,37 @@ function renderPredictionSummary(prediction) {
   const sourceCheck = summary.source_check || summary.sourceCheck || {};
   const winner = summary.winner || summary.win_tendency || summary.full_time?.winner || summary.full_time?.tendency;
   const confidence = summary.confidence || summary.confidence_score || summary.source_reliability?.confidence || "模型未给出明确信心程度";
+  const situation = summaryText(summary.full_time || summary.fullTime || summary.situation || summary.key_evidence, "模型未给出整场局势摘要。");
+  const firstHalf = summaryText(summary.first_half || summary.firstHalf, "上半场走势待补充。");
+  const goals = valueText(summary.total_goals || summary.goals || summary.goal_line || summary.over_under || summary.market_check?.total_goals, "未明确");
+  const halfFull = valueText(summary.half_full || summary.halfFull || summary.ht_ft || summary.entertainment_top3?.[0]?.half_full || summary.entertainmentTop3?.[0]?.halfFull, "未明确");
+  const scorePick = valueText(summary.score || summary.score_range || summary.scoreRange || summary.entertainment_top3?.[0]?.score || summary.entertainmentTop3?.[0]?.score, "未明确");
   return `
+    <section class="prediction-brief">
+      <span>整场局势预测分析</span>
+      <strong>${situation}</strong>
+      <p>${summaryText(summary.key_evidence || summary.evidence || summary.filter_reason, "关键依据待补充。")}</p>
+    </section>
     <div class="prediction-summary-grid">
       <article class="result-card accent">
-        <span>胜负倾向</span>
+        <span>胜平负</span>
         <strong>${valueText(winner, "模型未给出明确胜负倾向")}</strong>
         <p><b class="score-chip">信心 ${scoreDetail.confidenceScore}%</b><b class="score-chip muted">可分析度 ${scoreDetail.score}%</b></p>
       </article>
       <article class="result-card">
-        <span>是否可分析</span>
-        <strong>${summary.is_analyzable === false ? "建议跳过" : "可分析 / 谨慎观察"}</strong>
-        <p>${valueText(summary.filter_reason, "模型未给出过滤理由")}</p>
+        <span>进球数</span>
+        <strong>${goals}</strong>
+        <p>${summary.is_analyzable === false ? "建议跳过" : "可分析 / 谨慎观察"}</p>
       </article>
       <article class="result-card">
-        <span>信息源校验</span>
-        <strong>${scoreDetail.sourceScore}%</strong>
-        <p>${valueText(sourceCheck.summary || summary.source_reliability, "模型未给出来源摘要")}</p>
+        <span>半全场</span>
+        <strong>${halfFull}</strong>
+        <p>${firstHalf}</p>
+      </article>
+      <article class="result-card">
+        <span>比分</span>
+        <strong>${scorePick}</strong>
+        <p>娱乐参考，不作为投资建议</p>
       </article>
     </div>
     <div class="prediction-section">
@@ -996,6 +1017,9 @@ setInterval(() => {
   refreshScoreboards().catch(() => {});
   loadPredictions().then(render).catch(() => {});
 }, 30 * 1000);
+setInterval(() => {
+  loadPredictions().then(render).catch(() => {});
+}, 5 * 1000);
 
 async function loadPredictions() {
   if (!window.location.protocol.startsWith("http")) return;

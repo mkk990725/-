@@ -13,9 +13,25 @@
 
         <div class="layout">
           <aside class="sidebar">
-            <button class="menu-item active" type="button">任务概览</button>
-            <button class="menu-item" type="button" @click="scrollToLog">处理日志</button>
-            <button class="menu-item" type="button" @click="loadHistory">历史记录</button>
+            <div class="brand-block">
+              <div class="brand-mark">AI</div>
+              <div>
+                <h1>赛前分析台</h1>
+                <p>世界杯赛程 · 预测工作台</p>
+              </div>
+            </div>
+            <nav class="side-nav" aria-label="主导航">
+              <a href="/index.html">比赛分析</a>
+              <a href="/config.html">模型配置</a>
+              <a class="active" href="/predict.html">预测模块</a>
+              <a href="/teams.html">球队资料</a>
+              <a href="/skills.html">分析技能</a>
+            </nav>
+            <div class="task-nav">
+              <button class="menu-item active" type="button">任务概览</button>
+              <button class="menu-item" type="button" @click="scrollToLog">处理日志</button>
+              <button class="menu-item" type="button" @click="loadHistory">历史记录</button>
+            </div>
           </aside>
 
           <section class="main-content">
@@ -57,6 +73,14 @@
 
               <div class="button-row">
                 <button
+                  type="button"
+                  class="prematch-update-button"
+                  :disabled="!selectedMatch || prematchLoading"
+                  @click="updatePrematchInfo"
+                >
+                  {{ prematchLoading ? "更新赛前信息中..." : "更新赛前信息" }}
+                </button>
+                <button
                   id="startButton"
                   type="button"
                   class="primary-run-button"
@@ -91,6 +115,28 @@
               </section>
             </n-card>
 
+            <n-card v-if="prematchInfo" class="glass-card result-card" :bordered="false">
+              <template #header>赛前信息模块</template>
+              <section class="prematch-summary" :class="{ changed: prematchInfo.changed }">
+                <strong>{{ prematchInfo.changed ? "✅ 更新内容摘要" : "赛前信息已检查" }}</strong>
+                <p>{{ prematchInfo.summary }}</p>
+                <span>{{ prematchInfo.phase?.label }} · {{ formatCheckedAt(prematchInfo.checkedAt) }}</span>
+              </section>
+              <div class="prematch-focus">
+                <span v-for="item in prematchInfo.focus || []" :key="item">{{ item }}</span>
+              </div>
+              <div class="prematch-source-grid">
+                <article v-for="item in prematchInfo.items || []" :key="item.id" :class="`source-${item.status}`">
+                  <div>
+                    <span>{{ item.tier }}</span>
+                    <strong>{{ item.name }}</strong>
+                  </div>
+                  <p>{{ item.note }}</p>
+                  <a :href="item.url" target="_blank" rel="noopener noreferrer">打开来源</a>
+                </article>
+              </div>
+            </n-card>
+
             <n-card v-if="sourceNeedsVisible" class="glass-card result-card" :bordered="false">
               <template #header>信息源缺口诊断</template>
               <n-alert type="warning" :bordered="false">
@@ -105,17 +151,34 @@
 
             <n-card v-if="prediction" class="glass-card result-card" :bordered="false">
               <template #header>预测结果</template>
-              <n-grid :cols="24" :x-gap="14" :y-gap="14" responsive="screen">
-                <n-grid-item :span="24" :m="8">
-                  <n-statistic label="胜负倾向" :value="resultWinner" />
-                </n-grid-item>
-                <n-grid-item :span="24" :m="8">
-                  <n-statistic label="信心程度" :value="resultConfidence" />
-                </n-grid-item>
-                <n-grid-item :span="24" :m="8">
-                  <n-statistic label="可分析状态" :value="resultAnalyzable" />
-                </n-grid-item>
-              </n-grid>
+              <section class="situation-summary">
+                <span>整场局势预测分析</span>
+                <strong>{{ resultSituation }}</strong>
+                <p>{{ resultEvidence }}</p>
+              </section>
+
+              <div class="prediction-units">
+                <article>
+                  <span>胜平负</span>
+                  <strong>{{ resultWinner }}</strong>
+                  <p>{{ resultConfidence }}</p>
+                </article>
+                <article>
+                  <span>进球数</span>
+                  <strong>{{ resultGoals }}</strong>
+                  <p>{{ resultAnalyzable }}</p>
+                </article>
+                <article>
+                  <span>半全场</span>
+                  <strong>{{ resultHalfFull }}</strong>
+                  <p>{{ resultFirstHalf }}</p>
+                </article>
+                <article>
+                  <span>比分</span>
+                  <strong>{{ resultScore }}</strong>
+                  <p>娱乐参考，不作为投资建议</p>
+                </article>
+              </div>
 
               <div ref="chartEl" class="chart"></div>
 
@@ -178,10 +241,13 @@ const completedSteps = ref(0);
 const running = ref(false);
 const buttonText = ref("开始处理");
 const prediction = ref(null);
+const prematchInfo = ref(null);
+const prematchLoading = ref(false);
 const sourceNeedsVisible = ref(true);
 const logPanel = ref(null);
 const chartEl = ref(null);
 let chart;
+let jobTimer;
 
 const sourceNeeds = ref([]);
 
@@ -197,6 +263,12 @@ const top3 = computed(() => Array.isArray(prediction.value?.entertainment_top3 |
 const resultWinner = computed(() => valueText(prediction.value?.winner || prediction.value?.win_tendency || prediction.value?.full_time?.winner || prediction.value?.full_time?.tendency, "未明确"));
 const resultConfidence = computed(() => valueText(prediction.value?.confidence || prediction.value?.confidence_score || prediction.value?.source_reliability?.confidence, "未明确"));
 const resultAnalyzable = computed(() => prediction.value?.is_analyzable === false ? "建议跳过" : "可分析 / 谨慎观察");
+const resultSituation = computed(() => summarizeText(prediction.value?.full_time || prediction.value?.fullTime || prediction.value?.situation || prediction.value?.key_evidence, "模型未给出整场局势摘要。"));
+const resultEvidence = computed(() => summarizeText(prediction.value?.key_evidence || prediction.value?.evidence || prediction.value?.filter_reason, "关键依据待补充。"));
+const resultFirstHalf = computed(() => summarizeText(prediction.value?.first_half || prediction.value?.firstHalf, "上半场走势待补充。"));
+const resultGoals = computed(() => valueText(prediction.value?.total_goals || prediction.value?.goals || prediction.value?.goal_line || prediction.value?.over_under || prediction.value?.market_check?.total_goals, "未明确"));
+const resultHalfFull = computed(() => valueText(prediction.value?.half_full || prediction.value?.halfFull || prediction.value?.ht_ft || prediction.value?.entertainment_top3?.[0]?.half_full || prediction.value?.entertainmentTop3?.[0]?.halfFull, "未明确"));
+const resultScore = computed(() => valueText(prediction.value?.score || prediction.value?.score_range || prediction.value?.scoreRange || prediction.value?.entertainment_top3?.[0]?.score || prediction.value?.entertainmentTop3?.[0]?.score, "未明确"));
 
 function zhTeam(name) {
   return teamNameZh[name] || name || "待确认";
@@ -204,6 +276,11 @@ function zhTeam(name) {
 
 function timestamp() {
   return new Date().toLocaleTimeString("zh-CN", { hour12: false });
+}
+
+function formatCheckedAt(value) {
+  if (!value) return "未记录时间";
+  return new Date(value).toLocaleString("zh-CN", { hour12: false });
 }
 
 function currentBeijingIsoDate() {
@@ -298,6 +375,28 @@ async function loadDataSources() {
   }));
 }
 
+async function updatePrematchInfo() {
+  if (!selectedMatch.value) return;
+  prematchLoading.value = true;
+  try {
+    log("正在更新赛前信息：Reuters / AP / FIFA / Guardian / BBC / Sky / ESPN / The Analyst / 官方社媒入口...");
+    const response = await fetch("/api/prematch-update", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ match: selectedMatch.value })
+    });
+    if (!response.ok) throw new Error(`赛前信息接口 HTTP ${response.status}`);
+    prematchInfo.value = await response.json();
+    message.success(`✅ ${prematchInfo.value.summary}`);
+    log(`✅ ${prematchInfo.value.summary}`);
+  } catch (error) {
+    message.error(error.message);
+    log(`赛前信息更新失败：${error.message}`);
+  } finally {
+    prematchLoading.value = false;
+  }
+}
+
 function shiftDate(days) {
   selectedDate.value = addDays(selectedDate.value, days);
   loadMatches().catch((error) => {
@@ -366,6 +465,12 @@ function valueText(value, fallback = "待模型给出") {
   return String(value);
 }
 
+function summarizeText(value, fallback = "待模型给出") {
+  const text = valueText(value, fallback);
+  if (text === fallback) return text;
+  return text.length > 120 ? `${text.slice(0, 120)}...` : text;
+}
+
 function confidenceNumber() {
   const raw = prediction.value?.confidence_score || prediction.value?.confidence || 50;
   const num = Number(String(raw).replace(/[^\d.]/g, ""));
@@ -405,36 +510,25 @@ async function runTask() {
   const taskMatchKey = selectedMatchKey.value;
   const taskMatch = { ...selectedMatch.value };
   running.value = true;
-  buttonText.value = "处理中...";
+  buttonText.value = "后台处理中...";
   completedSteps.value = 0;
   logs.value = [];
   prediction.value = null;
   try {
-    await sleep(1500);
-    log("正在连接知识库...");
+    log("正在提交后台预测任务...");
     completedSteps.value = 1;
-    await sleep(1500);
-    log("正在检索信息：ESPN 赛程、球队名单、已有预测库与信息源缺口...");
-    await loadMatches();
-    selectedMatchKey.value = taskMatchKey;
-    completedSteps.value = 2;
-    await sleep(1500);
-    log("正在推理分析：检查真实表现质量、机会质量、阵容完整度与战术证据是否缺失...");
-    completedSteps.value = 3;
-    await sleep(1500);
-    log("正在生成回复...");
-    const response = await fetch("/api/predict", {
+    const response = await fetch("/api/predict-task", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ match: taskMatch })
     });
-    if (!response.ok) throw new Error(`预测接口 HTTP ${response.status}`);
-    prediction.value = parsePrediction(await response.json());
-    completedSteps.value = 4;
-    buttonText.value = "处理完成";
-    await nextTick();
-    renderChart();
-    alert("所有任务执行完毕！");
+    if (!response.ok) throw new Error(`预测任务接口 HTTP ${response.status}`);
+    const job = await response.json();
+    localStorage.setItem("footballAgent.activePredictionJob", JSON.stringify({ id: job.id, matchKey: taskMatchKey }));
+    log("后台任务已启动，可以切换到主界面或其他页面。");
+    selectedMatchKey.value = taskMatchKey;
+    completedSteps.value = 2;
+    await pollPredictionJob(job.id);
   } catch (error) {
     log(`任务失败：${error.message}`);
     message.error(error.message);
@@ -442,6 +536,38 @@ async function runTask() {
   } finally {
     running.value = false;
   }
+}
+
+async function pollPredictionJob(id) {
+  clearTimeout(jobTimer);
+  const response = await fetch(`/api/predict-task?id=${encodeURIComponent(id)}`);
+  if (!response.ok) throw new Error(`任务状态接口 HTTP ${response.status}`);
+  const job = await response.json();
+  for (const entry of job.logs || []) {
+    const text = entry.text || "";
+    if (text && !logs.value.some((item) => item.text === text)) log(text);
+  }
+  if (job.status === "running" || job.status === "queued") {
+    completedSteps.value = Math.max(2, Math.min(3, Math.ceil((job.progress || 0) / 35)));
+    jobTimer = setTimeout(() => pollPredictionJob(id).catch((error) => {
+      log(`任务轮询失败：${error.message}`);
+      buttonText.value = "重新处理";
+      running.value = false;
+    }), 2000);
+    return;
+  }
+  if (job.status === "completed") {
+    prediction.value = parsePrediction(job.result || {});
+    completedSteps.value = 4;
+    buttonText.value = "处理完成";
+    running.value = false;
+    localStorage.removeItem("footballAgent.activePredictionJob");
+    await nextTick();
+    renderChart();
+    message.success("预测完成，结果已同步到比赛分析页。");
+    return;
+  }
+  throw new Error(job.error || "后台任务失败");
 }
 
 async function runCodexPackage() {
@@ -479,14 +605,33 @@ async function loadHistory() {
   log(`历史记录读取完成：${Object.keys(payload).length} 条预测索引。`);
 }
 
+function restoreActiveJob() {
+  try {
+    const cached = JSON.parse(localStorage.getItem("footballAgent.activePredictionJob") || "null");
+    if (!cached?.id) return;
+    running.value = true;
+    buttonText.value = "后台处理中...";
+    log("已恢复一个后台预测任务，继续监听结果。");
+    pollPredictionJob(cached.id).catch((error) => {
+      log(`恢复任务失败：${error.message}`);
+      running.value = false;
+      buttonText.value = "重新处理";
+    });
+  } catch {}
+}
+
 window.addEventListener("resize", () => chart?.resize());
-onBeforeUnmount(() => chart?.dispose());
+onBeforeUnmount(() => {
+  clearTimeout(jobTimer);
+  chart?.dispose();
+});
 
 loadMatches().catch((error) => {
   log(`赛程同步失败：${error.message}`);
   message.error(error.message);
 });
 loadDataSources().catch(() => {});
+restoreActiveJob();
 </script>
 
 <style scoped>
@@ -579,6 +724,72 @@ loadDataSources().catch(() => {});
   background:
     linear-gradient(165deg, rgba(15, 21, 30, 0.98) 0%, rgba(8, 11, 17, 1) 52%, #060910 100%),
     radial-gradient(120% 80% at 0% 0%, rgba(98, 167, 255, 0.1) 0%, transparent 55%);
+}
+
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(42, 53, 68, 0.72);
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  color: #0f172a;
+  background: linear-gradient(145deg, #f0f5ff 0%, #62a7ff 55%, #3d7edc 100%);
+  font-weight: 900;
+}
+
+.brand-block h1 {
+  margin: 0;
+  font-size: 18px;
+  background: linear-gradient(125deg, #f0f5ff 0%, #9ec5ff 55%, #7aa8ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.brand-block p {
+  margin: 4px 0 0;
+  color: #8b97ab;
+  font-size: 12px;
+}
+
+.side-nav,
+.task-nav {
+  display: grid;
+  gap: 6px;
+}
+
+.side-nav {
+  margin-bottom: 18px;
+}
+
+.side-nav a {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: #8b97ab;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.side-nav a.active,
+.side-nav a:hover {
+  color: #e8eef8;
+  border-color: rgba(98, 167, 255, 0.35);
+  background: rgba(98, 167, 255, 0.12);
+  box-shadow: inset 3px 0 0 rgba(98, 167, 255, 0.88);
 }
 
 .menu-item {
@@ -709,7 +920,8 @@ loadDataSources().catch(() => {});
 }
 
 .primary-run-button,
-.codex-mini-button {
+.codex-mini-button,
+.prematch-update-button {
   border: 1px solid transparent;
   border-radius: 10px;
   font: inherit;
@@ -737,8 +949,18 @@ loadDataSources().catch(() => {});
   font-size: 12px;
 }
 
+.prematch-update-button {
+  min-height: 40px;
+  padding: 0 14px;
+  color: #172033;
+  border-color: #cbd5e1;
+  background: #ffffff;
+  font-size: 13px;
+}
+
 .primary-run-button:hover:not(:disabled),
-.codex-mini-button:hover:not(:disabled) {
+.codex-mini-button:hover:not(:disabled),
+.prematch-update-button:hover:not(:disabled) {
   transform: translateY(-1px);
   border-color: #2f6fec;
   box-shadow: 0 12px 26px rgba(47, 111, 236, 0.22);
@@ -746,6 +968,7 @@ loadDataSources().catch(() => {});
 
 .primary-run-button:focus-visible,
 .codex-mini-button:focus-visible,
+.prematch-update-button:focus-visible,
 .home-link:focus-visible,
 .menu-item:focus-visible,
 .native-control:focus-visible {
@@ -754,7 +977,8 @@ loadDataSources().catch(() => {});
 }
 
 .primary-run-button:disabled,
-.codex-mini-button:disabled {
+.codex-mini-button:disabled,
+.prematch-update-button:disabled {
   cursor: not-allowed;
   opacity: 0.52;
   box-shadow: none;
@@ -811,6 +1035,164 @@ loadDataSources().catch(() => {});
   margin-top: 16px;
 }
 
+.situation-summary {
+  padding: 16px;
+  border: 1px solid #dce4ee;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.situation-summary span,
+.prediction-units span {
+  display: block;
+  color: #6b7688;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.situation-summary strong {
+  display: block;
+  margin-top: 8px;
+  color: #172033;
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.situation-summary p,
+.prediction-units p {
+  margin: 8px 0 0;
+  color: #6b7688;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.prediction-units {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.prediction-units article {
+  min-height: 118px;
+  padding: 14px;
+  border: 1px solid #dce4ee;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(26, 39, 69, 0.05);
+}
+
+.prediction-units strong {
+  display: block;
+  margin-top: 8px;
+  color: #172033;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.prematch-summary {
+  padding: 16px;
+  border: 1px solid #dce4ee;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.prematch-summary.changed {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.prematch-summary strong {
+  display: block;
+  color: #172033;
+  font-size: 18px;
+}
+
+.prematch-summary p {
+  margin: 8px 0;
+  color: #334155;
+  line-height: 1.6;
+}
+
+.prematch-summary span {
+  color: #6b7688;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.prematch-focus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.prematch-focus span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: #2f6fec;
+  background: #eef4ff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.prematch-source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.prematch-source-grid article {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #dce4ee;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.prematch-source-grid article.source-manual {
+  background: #fff7ed;
+}
+
+.prematch-source-grid article.source-unavailable {
+  background: #fff7f6;
+}
+
+.prematch-source-grid article.source-checked {
+  background: #f8fbff;
+}
+
+.prematch-source-grid span {
+  color: #6b7688;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.prematch-source-grid strong {
+  display: block;
+  margin-top: 4px;
+  color: #172033;
+  font-size: 14px;
+}
+
+.prematch-source-grid p {
+  margin: 0;
+  color: #6b7688;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.prematch-source-grid a {
+  color: #2f6fec;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
 .top3 {
   display: flex;
   flex-wrap: wrap;
@@ -825,9 +1207,24 @@ loadDataSources().catch(() => {});
   .sidebar {
     border-right: 0;
     border-bottom: 1px solid #dce4ee;
-    display: grid;
+  }
+
+  .brand-block {
+    display: none;
+  }
+
+  .side-nav,
+  .task-nav {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
+  }
+
+  .side-nav {
+    margin-bottom: 10px;
+  }
+
+  .side-nav a {
+    justify-content: center;
   }
 
   .menu-item {
@@ -846,6 +1243,8 @@ loadDataSources().catch(() => {});
   }
 
   .stepper,
+  .prediction-units,
+  .prematch-source-grid,
   .analysis-grid {
     grid-template-columns: 1fr;
   }
