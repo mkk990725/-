@@ -154,6 +154,26 @@ function collectModelFromForm() {
   };
 }
 
+function showConfigToast({ title, message, type = "success", duration = 3000 }) {
+  document.querySelectorAll(".config-toast").forEach((item) => item.remove());
+  const toast = document.createElement("div");
+  toast.className = `config-toast ${type}`;
+  toast.innerHTML = `
+    <div class="config-toast-icon">✓</div>
+    <div class="config-toast-body">
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(message)}</p>
+      <span class="config-toast-progress"></span>
+    </div>
+  `;
+  document.body.appendChild(toast);
+  window.setTimeout(() => toast.classList.add("visible"), 20);
+  window.setTimeout(() => {
+    toast.classList.remove("visible");
+    window.setTimeout(() => toast.remove(), 260);
+  }, duration);
+}
+
 document.getElementById("saveConfig").addEventListener("click", async () => {
   const status = document.getElementById("configStatus");
   try {
@@ -200,6 +220,10 @@ document.getElementById("testModel").addEventListener("click", async () => {
   try {
     const payload = await testModel({ ...currentConfig, model: collectModelFromForm() });
     status.textContent = `联通成功：${payload.model || "模型已响应"}，耗时 ${payload.elapsedMs} ms`;
+    showConfigToast({
+      title: "模型联通成功",
+      message: `${payload.model || "模型已响应"}，耗时 ${payload.elapsedMs} ms`
+    });
   } catch (error) {
     status.textContent = `联通失败：${error.message}`;
   } finally {

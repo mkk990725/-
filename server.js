@@ -832,12 +832,30 @@ function modelSettings(config) {
   };
 }
 
+function normalizeChatCompletionsUrl(apiUrl = "") {
+  const raw = String(apiUrl || "").trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    const path = url.pathname.replace(/\/+$/, "");
+    if (!path || path === "/v1") {
+      url.pathname = `${path || ""}/chat/completions`;
+      return url.toString();
+    }
+    if (path.endsWith("/chat/completions")) return url.toString();
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
 async function callChatCompletions(config, messages, temperature = config.model?.temperature ?? 0.2, timeoutMs = 30000) {
   const settings = modelSettings(config);
   if (!settings.apiUrl || !settings.apiKey || !settings.model) {
     throw new Error("缺少 API URL / API Key / 模型名");
   }
-  const response = await fetch(settings.apiUrl, {
+  const endpoint = normalizeChatCompletionsUrl(settings.apiUrl);
+  const response = await fetch(endpoint, {
     method: "POST",
     signal: AbortSignal.timeout(timeoutMs),
     headers: {

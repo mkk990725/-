@@ -29,7 +29,7 @@ function currentBeijingIsoDate() {
 
 function initialSelectedMatchId() {
   const urlMatchId = new URLSearchParams(window.location.search).get("match");
-  if (urlMatchId && window.WORLD_CUP_FIXTURES.some((match) => match.id === urlMatchId)) return urlMatchId;
+  if (urlMatchId) return urlMatchId;
   const cachedMatchId = localStorage.getItem("selectedMatchId");
   if (cachedMatchId && window.WORLD_CUP_FIXTURES.some((match) => match.id === cachedMatchId)) return cachedMatchId;
   const firstToday = window.WORLD_CUP_FIXTURES
@@ -122,6 +122,14 @@ function zhTeam(name) {
 
 function getSelectedMatch() {
   return window.WORLD_CUP_FIXTURES.find((match) => match.id === state.selectedId) || window.WORLD_CUP_FIXTURES[0];
+}
+
+function syncDetailDateToSelectedMatch() {
+  if (pageMode !== "match-detail") return;
+  const match = window.WORLD_CUP_FIXTURES.find((item) => item.id === state.selectedId);
+  if (!match?.date) return;
+  state.dateStart = match.date;
+  state.dateEnd = match.date;
 }
 
 function factorScore(factor) {
@@ -1146,6 +1154,7 @@ async function updatePrematchInfoForSelectedMatch() {
 
 function render() {
   dedupeMatchesByKey();
+  syncDetailDateToSelectedMatch();
   ensureUsableFilter();
   const visible = visibleMatches();
   if (pageMode === "match-list" && visible.length && !visible.some((item) => item.id === state.selectedId)) {

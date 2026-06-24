@@ -2086,6 +2086,80 @@ summary:focus-visible {
   font-weight: 800;
 }
 
+.config-toast {
+  position: fixed;
+  right: 28px;
+  top: 28px;
+  z-index: 1000;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px 14px 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: 16px;
+  color: #14532d;
+  background: #f0fdf4;
+  box-shadow: 0 24px 70px -42px rgba(20, 83, 45, 0.72);
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  overflow: hidden;
+}
+
+.config-toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.config-toast-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  color: #fff;
+  background: #16a34a;
+  font-weight: 900;
+}
+
+.config-toast-body {
+  min-width: 0;
+}
+
+.config-toast-body strong {
+  display: block;
+  font-size: 14px;
+}
+
+.config-toast-body p {
+  margin-top: 3px;
+  color: #166534;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.config-toast-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  background: #22c55e;
+  transform-origin: left center;
+  animation: toast-progress 3s linear forwards;
+}
+
+@keyframes toast-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
 .skill-doc {
   display: grid;
   gap: 14px;
