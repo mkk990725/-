@@ -23,6 +23,12 @@ const PREDICTION_CACHE = path.join(CACHE_DIR, "predictions.json");
 const predictionJobs = new Map();
 const SQUAD_TTL_MS = Number(process.env.SQUAD_TTL_HOURS || 12) * 60 * 60 * 1000;
 const PLAYER_TTL_MS = Number(process.env.PLAYER_TTL_HOURS || 48) * 60 * 60 * 1000;
+const MANUAL_MATCH_SOURCE_URLS = {
+  "japan|sweden": {
+    fifaMatchCentre: "https://www.fifa.com/en/match-centre/match/17/285023/289273/400021471?date=2026-06-26"
+  }
+};
+
 const STATIC_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -456,33 +462,58 @@ function prematchPhase(match) {
 function prematchSearchSources(match) {
   const home = match?.home || "";
   const away = match?.away || "";
+  const manualSourceKey = [home, away].map((team) => String(team || "").trim().toLowerCase()).sort().join("|");
+  const manualUrls = MANUAL_MATCH_SOURCE_URLS[manualSourceKey] || {};
+  const fifaMatchCentreUrl = manualUrls.fifaMatchCentre || "https://www.fifa.com/en/match-centre";
   const q = encodeURIComponent(`"${home}" "${away}" World Cup team news lineups`);
   const loose = encodeURIComponent(`${home} ${away} World Cup team news lineups`);
   return [
-    { id: "reuters-team-news", name: "Reuters team news", tier: "权威媒体", url: `https://www.reuters.com/site-search/?query=${loose}`, keywords: ["team news", "injury", "lineup", home, away], home, away },
-    { id: "ap-team-news", name: "AP team news", tier: "权威媒体", url: `https://apnews.com/search?q=${loose}`, keywords: ["injury", "lineup", home, away], home, away },
-    { id: "guardian-live", name: "Guardian live / minute-by-minute", tier: "直播/赛前页", url: `https://www.theguardian.com/football/live`, keywords: ["live", home, away], home, away },
-    { id: "guardian-search", name: "Guardian match search", tier: "直播/赛前页", url: `https://www.theguardian.com/football/search?q=${loose}`, keywords: [home, away, "team news", "live"], home, away },
-    { id: "bbc-search", name: "BBC Sport search", tier: "二次确认", url: `https://www.bbc.co.uk/search?q=${loose}`, keywords: [home, away, "line-ups", "team news"], home, away },
-    { id: "sky-search", name: "Sky Sports search", tier: "二次确认", url: `https://www.skysports.com/search?q=${loose}`, keywords: [home, away, "team news", "lineups"], home, away },
-    { id: "espn-soccer", name: "ESPN Soccer", tier: "二次确认", url: `https://www.espn.com/soccer/`, keywords: [home, away, "lineups"], home, away },
-    { id: "theanalyst-search", name: "The Analyst / Opta", tier: "结构化数据", url: `https://theanalyst.com/?s=${q}`, keywords: [home, away, "preview", "stats"], home, away },
-    { id: "fifa-match-centre", name: "FIFA Match Centre", tier: "官方源", url: "https://www.fifa.com/en/match-centre", keywords: [home, away, "lineup"], home, away },
-    { id: "fifa-live", name: "FIFA Live", tier: "官方源", url: "https://www.fifa.com/live", keywords: [home, away], home, away },
-    { id: "x-starting-xi", name: "两队官方 X / 赛事官方社媒", tier: "官方社媒", url: `https://x.com/search?q=${encodeURIComponent(`"Starting XI" "${home}" OR "${away}"`)}`, manual: true },
-    { id: "instagram-starting-xi", name: "两队官方 Instagram", tier: "官方社媒", url: `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(`${home} ${away} Starting XI`)}`, manual: true }
+    { id: "fifa-fixtures-static", name: "FIFA 官方赛程/球场/分组", tier: "官方静态资料", url: "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums", keywords: [home, away], home, away, collectionMode: "static_once", refreshPolicy: "首次入库；赛程变更时手动复核", dataTargets: ["赛程真实性", "比赛日期", "球场", "分组"] },
+    { id: "fifa-match-centre-overview", name: "FIFA Match Centre - Overview", tier: "官方子页面", url: fifaMatchCentreUrl, manual: true, collectionMode: "official_browser_subpage", refreshPolicy: "单场授权打开后读取", dataTargets: ["比赛状态", "官方 Match Facts", "官方事件摘要"] },
+    { id: "fifa-match-centre-lineups", name: "FIFA Match Centre - Line-ups", tier: "官方子页面", url: fifaMatchCentreUrl, manual: true, collectionMode: "official_browser_subpage", refreshPolicy: "开赛前 60-75 分钟重点复核", dataTargets: ["官方首发", "阵型", "替补", "临场伤退"] },
+    { id: "fifa-match-centre-stats", name: "FIFA Match Centre - Statistics", tier: "官方子页面", url: fifaMatchCentreUrl, manual: true, collectionMode: "official_browser_subpage", refreshPolicy: "赛中/赛后单场授权读取", dataTargets: ["控球", "射门", "xG/技术统计", "比赛事件"] },
+    { id: "fifa-live", name: "FIFA Live", tier: "官方动态源", url: "https://www.fifa.com/live", keywords: [home, away], home, away, collectionMode: "dynamic_summary", refreshPolicy: "赛前时间窗检查摘要，不做高频抓取", dataTargets: ["官方快讯", "首发提示", "比赛事件"] },
+    { id: "reuters-team-news", name: "Reuters team news", tier: "权威媒体", url: `https://www.reuters.com/site-search/?query=${loose}`, keywords: ["team news", "injury", "lineup", home, away], home, away, collectionMode: "dynamic_summary", refreshPolicy: "开赛前 24 小时、3-6 小时各检查一次", dataTargets: ["伤停", "发布会", "预计首发"] },
+    { id: "ap-team-news", name: "AP team news", tier: "权威媒体", url: `https://apnews.com/search?q=${loose}`, keywords: ["injury", "lineup", home, away], home, away, collectionMode: "dynamic_summary", refreshPolicy: "开赛前 24 小时、3-6 小时各检查一次", dataTargets: ["伤停", "赛前新闻", "球队动态"] },
+    { id: "guardian-live", name: "Guardian live / minute-by-minute", tier: "直播/赛前页", url: `https://www.theguardian.com/football/live`, keywords: ["live", home, away], home, away, collectionMode: "dynamic_summary", refreshPolicy: "直播页开启后摘要检查", dataTargets: ["赛前动态", "比赛过程"] },
+    { id: "guardian-search", name: "Guardian match search", tier: "直播/赛前页", url: `https://www.theguardian.com/football/search?q=${loose}`, keywords: [home, away, "team news", "live"], home, away, collectionMode: "dynamic_summary", refreshPolicy: "开赛前 24 小时检查一次", dataTargets: ["单场预览", "直播记录"] },
+    { id: "bbc-search", name: "BBC Sport search", tier: "二次确认", url: `https://www.bbc.co.uk/search?q=${loose}`, keywords: [home, away, "line-ups", "team news"], home, away, collectionMode: "dynamic_summary", refreshPolicy: "开赛前 3-6 小时、60-75 分钟检查", dataTargets: ["首发二次确认", "伤停"] },
+    { id: "sky-search", name: "Sky Sports search", tier: "二次确认", url: `https://www.skysports.com/search?q=${loose}`, keywords: [home, away, "team news", "lineups"], home, away, collectionMode: "dynamic_summary", refreshPolicy: "开赛前 3-6 小时、60-75 分钟检查", dataTargets: ["首发二次确认", "临场消息"] },
+    { id: "espn-soccer", name: "ESPN Soccer", tier: "结构化数据", url: `https://www.espn.com/soccer/`, keywords: [home, away, "lineups"], home, away, collectionMode: "dynamic_summary", refreshPolicy: "赛程和赛中数据按单场摘要更新", dataTargets: ["赛程", "首发", "比分", "技术统计"] },
+    { id: "theanalyst-search", name: "The Analyst / Opta", tier: "结构化数据", url: `https://theanalyst.com/?s=${q}`, keywords: [home, away, "preview", "stats"], home, away, collectionMode: "static_article_once", refreshPolicy: "赛前文章首次发现后入库；有新文章再更新", dataTargets: ["战术数据", "预测模型", "xG/射门质量"] },
+    { id: "sofascore-authorized-match", name: "SofaScore 单场授权页", tier: "结构化数据", url: "https://www.sofascore.com/", manual: true, collectionMode: "authorized_single_match", refreshPolicy: "你提供单场 URL 后读取页面可见摘要，不批量轮询", dataTargets: ["阵容", "评分", "攻势图", "技术统计", "H2H"] },
+    { id: "fotmob-authorized-match", name: "FotMob 单场授权页", tier: "结构化数据", url: "https://www.fotmob.com/", manual: true, collectionMode: "authorized_single_match", refreshPolicy: "你提供单场 URL 后一次整理；遵守 FotMob 对自动化的限制", dataTargets: ["伤停", "排名", "场地", "xG/射门图"] },
+    { id: "x-starting-xi", name: "两队官方 X / 赛事官方社媒", tier: "官方社媒", url: `https://x.com/search?q=${encodeURIComponent(`"Starting XI" "${home}" OR "${away}"`)}`, manual: true, collectionMode: "authorized_social", refreshPolicy: "开赛前 60-75 分钟由你登录后授权查看", dataTargets: ["官方首发", "热身伤退", "训练动态"] },
+    { id: "instagram-starting-xi", name: "两队官方 Instagram", tier: "官方社媒", url: `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(`${home} ${away} Starting XI`)}`, manual: true, collectionMode: "authorized_social", refreshPolicy: "开赛前 60-75 分钟由你登录后授权查看", dataTargets: ["官方首发", "训练图文", "临场动态"] }
   ];
 }
 
 async function fetchSourcePreview(source) {
+  const credentialHintForSource = () => {
+    if (source.collectionMode === "official_browser_subpage") {
+      return "需要你在浏览器中打开对应 FIFA 单场子页面；系统只整理页面上已经显示的官方信息。";
+    }
+    if (source.collectionMode === "authorized_single_match") {
+      return "需要你登录后提供具体单场 URL；系统只整理该场页面可见信息，不做批量轮询。";
+    }
+    if (source.id.includes("instagram")) {
+      return "需要 Instagram 可访问账号或你提供官方账号截图/链接。";
+    }
+    if (source.id.includes("x-")) {
+      return "需要 X/Twitter 可访问账号或你提供两队官方账号的首发/伤停截图。";
+    }
+    return "需要你打开授权页面或提供页面截图/正文后再入库。";
+  };
   if (source.manual) return {
     ...source,
     status: "manual",
     title: "",
     matchedKeywords: [],
     needsCredential: true,
-    credentialHint: source.id.includes("instagram") ? "需要 Instagram 可访问账号或你提供官方账号截图/链接。" : "需要 X/Twitter 可访问账号或你提供两队官方账号的首发/伤停截图。",
-    note: "该源属于登录或动态页面，本地服务不能稳定直接抓取正文。",
+    credentialHint: credentialHintForSource(),
+    note: source.collectionMode === "official_browser_subpage"
+      ? "FIFA 单场数据由前端动态渲染，普通静态请求拿不到正文；需要浏览器中打开对应子页面核验。"
+      : "该源属于登录、动态页面或平台限制页面，本地服务不能稳定直接抓取正文。",
     evidence: []
   };
   const controller = new AbortController();
