@@ -336,7 +336,24 @@ function sortMatches(matches) {
 }
 
 function predictionFor(match) {
-  return state.predictions[match.id] || state.predictions[matchKey(match)] || state.predictions[`${match.date}|${match.home}|${match.away}`];
+  if (!match) return null;
+  const id = String(match.id || "");
+  const candidates = [
+    id,
+    id.startsWith("espn-") ? id.slice(5) : `espn-${id}`,
+    match.espnId,
+    match.espnId && String(match.espnId).startsWith("espn-") ? String(match.espnId).slice(5) : match.espnId ? `espn-${match.espnId}` : "",
+    matchKey(match),
+    `${match.date}|${match.home}|${match.away}`
+  ].filter(Boolean);
+  for (const key of candidates) {
+    if (state.predictions[key]) return state.predictions[key];
+  }
+  const normalizedTeams = [match.home, match.away].map((team) => String(team || "").trim()).sort().join("|");
+  return Object.values(state.predictions).find((prediction) => {
+    const teams = [prediction.home, prediction.away].map((team) => String(team || "").trim()).sort().join("|");
+    return prediction.date === match.date && teams === normalizedTeams;
+  }) || null;
 }
 
 function statusClass(match) {
@@ -860,6 +877,15 @@ function zhLabel(key) {
   return keyLabelMap[key] || "补充信息";
 }
 
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function polishText(text) {
   let output = String(text || "")
     .replace(/\s+/g, " ")
@@ -1167,9 +1193,16 @@ function renderPrematchInfo(info) {
   const accessible = (info.items || []).filter((item) => item.status === "checked");
   const manual = (info.items || []).filter((item) => item.status === "manual");
   const unavailable = (info.items || []).filter((item) => item.status === "unavailable");
+  const sourceItems = info.items?.length ? info.items : [{
+    status: "manual",
+    tier: "系统提示",
+    name: "暂无可展示来源",
+    note: "本次接口没有返回来源明细。需要检查后端赛前信息源配置或网络访问结果。",
+    url: ""
+  }];
   el.prematchPanel.innerHTML = `
     <section class="prematch-summary ${info.changed ? "changed" : ""}">
-      <strong>${info.changed ? "✅ 更新内容摘要" : "赛前信息已检查"}</strong>
+      <strong>${info.changed ? "✅ 发现赛前信息更新" : "目前是最新消息"}</strong>
       <p>${escapeHtml(info.summary)}</p>
       <span>${escapeHtml(info.phase?.label || "赛前信息检查")} · ${new Date(info.checkedAt).toLocaleString("zh-CN", { hour12: false })}</span>
     </section>
@@ -1182,14 +1215,14 @@ function renderPrematchInfo(info) {
       <b>暂不可抓取 ${unavailable.length}</b>
     </div>
     <div class="prematch-source-grid">
-      ${(info.items || []).map((item) => `
+      ${sourceItems.map((item) => `
         <article class="source-${escapeHtml(item.status)}">
           <div>
             <span>${escapeHtml(item.tier)}</span>
             <strong>${escapeHtml(item.name)}</strong>
           </div>
           <p>${escapeHtml(item.note)}</p>
-          <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${item.status === "checked" ? "打开来源" : "查看配置/入口"}</a>
+          ${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${item.status === "checked" ? "打开来源" : "查看配置/入口"}</a>` : ""}
         </article>
       `).join("")}
     </div>
@@ -1221,6 +1254,11 @@ async function updatePrematchInfoForSelectedMatch() {
     el.prematchUpdate.disabled = true;
     el.prematchUpdate.textContent = "更新中";
   }
+  showAppToast({
+    title: "正在更新赛前信息",
+    message: `${match.home} vs ${match.away}：正在检查官方、通讯社、主流媒体和数据入口。`,
+    duration: 2200
+  });
   el.prematchPanel.innerHTML = `<div class="empty-state">正在检查赛前信息源，优先验证官方、通讯社、主流媒体和数据入口...</div>`;
   try {
     const response = await fetch("/api/prematch-update", {
