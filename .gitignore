@@ -1,4 +1,6 @@
 .cache/
+__pycache__/
+.pytest_cache/
 model-config.json
 football-agent.db-shm
 football-agent.db-wal

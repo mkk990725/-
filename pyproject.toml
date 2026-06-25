@@ -1,0 +1,26 @@
+[project]
+name = "football-analysis-agent-backend"
+version = "0.1.0"
+description = "FastAPI backend and deterministic calculation engine for football pre-match analysis."
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "fastapi>=0.115,<1.0",
+  "uvicorn[standard]>=0.34,<1.0",
+  "pydantic>=2.10,<3.0",
+  "numpy>=2.1,<3.0",
+  "pandas>=2.2,<3.0",
+  "scipy>=1.14,<2.0",
+  "scikit-learn>=1.5,<2.0",
+  "apscheduler>=3.10,<4.0",
+  "httpx>=0.28,<1.0"
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0,<9.0"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+

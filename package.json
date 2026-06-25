@@ -7,6 +7,8 @@
     "start": "node server.js",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
+    "api:dev": "py -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload",
+    "test:py": "py -m pytest",
     "sync:once": "node server.js --once"
   },
   "dependencies": {
