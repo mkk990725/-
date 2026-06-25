@@ -1,10 +1,11 @@
 from fastapi import FastAPI
 
-from backend.app.api import matches, model_configs, predictions, prematch, teams
+from backend.app.api import compat, matches, model_configs, predictions, prematch, teams
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Football Analysis Agent API", version="0.1.0")
+    app.include_router(compat.router, prefix="/api", tags=["compat"])
     app.include_router(matches.router, prefix="/api", tags=["matches"])
     app.include_router(predictions.router, prefix="/api", tags=["predictions"])
     app.include_router(prematch.router, prefix="/api", tags=["prematch"])
@@ -19,4 +20,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

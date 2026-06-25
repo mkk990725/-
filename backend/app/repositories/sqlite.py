@@ -89,6 +89,26 @@ class SqliteRepository:
             return None
         return self._legacy_prediction_to_result(row)
 
+    def list_predictions(self) -> dict[str, PredictionResult]:
+        results: dict[str, PredictionResult] = {}
+        with self.connect() as conn:
+            rows = conn.execute("SELECT match_id, payload_json FROM py_predictions").fetchall()
+            for row in rows:
+                prediction = PredictionResult.model_validate_json(row["payload_json"])
+                results[row["match_id"]] = prediction
+            legacy_rows = conn.execute(
+                """
+                SELECT prediction_key, match_id, match_date, home, away, summary_json, generated_at
+                FROM predictions
+                ORDER BY generated_at DESC
+                """
+            ).fetchall()
+        for row in legacy_rows:
+            key = row["prediction_key"] or row["match_id"]
+            if key and key not in results:
+                results[key] = self._legacy_prediction_to_result(row)
+        return results
+
     def save_prediction(self, prediction: PredictionResult) -> None:
         with self.connect() as conn:
             conn.execute(

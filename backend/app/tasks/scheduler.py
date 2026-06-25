@@ -1,7 +1,8 @@
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from typing import Any
 
 
-def create_scheduler() -> AsyncIOScheduler:
+def create_scheduler() -> Any:
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
     scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
     return scheduler
-

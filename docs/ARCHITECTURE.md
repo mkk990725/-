@@ -109,3 +109,4 @@ npm run test:py
 
 The local `py` launcher currently points to Python 3.14. The selected numerical stack is safer on Python 3.11 or 3.12 because NumPy, SciPy, pandas, and scikit-learn release compatibility there first.
 
+On this workstation, the project uses an isolated local conda environment at `.conda/football-agent`. It is ignored by Git and does not modify existing Python environments or model configuration keys.
