@@ -864,6 +864,24 @@ const keyLabelMap = {
   playerFunctions: "球员功能",
   market_check: "市场校验",
   marketCheck: "市场校验",
+  match_filter: "比赛筛选",
+  matchFilter: "比赛筛选",
+  option_layers: "选项分层",
+  optionLayers: "选项分层",
+  portfolio_structure: "组合结构",
+  portfolioStructure: "组合结构",
+  cost_efficiency: "成本效率",
+  costEfficiency: "成本效率",
+  review_checklist: "复盘检查点",
+  reviewChecklist: "复盘检查点",
+  main_pick: "主选",
+  mainPick: "主选",
+  secondary_pick: "次选",
+  secondaryPick: "次选",
+  small_hedge: "小防",
+  smallHedge: "小防",
+  avoid_pick: "不建议",
+  avoidPick: "不建议",
   score: "比分",
   goals: "进球数",
   name: "分支名称",
@@ -1066,6 +1084,45 @@ function renderBranches(branches) {
   `;
 }
 
+function renderLayerPanel(title, value, fallback, className = "") {
+  const text = valueText(value, fallback);
+  return `
+    <article class="layer-panel ${className}">
+      <span>${escapeHtml(title)}</span>
+      ${renderReadableList(text, fallback, 5)}
+    </article>
+  `;
+}
+
+function renderOptionLayers(summary) {
+  const layers = summary.option_layers || summary.optionLayers || {};
+  const matchFilter = summary.match_filter || summary.matchFilter || summary.filter_reason || summary.filterReason;
+  const portfolio = summary.portfolio_structure || summary.portfolioStructure;
+  const cost = summary.cost_efficiency || summary.costEfficiency;
+  const review = summary.review_checklist || summary.reviewChecklist;
+  if (!matchFilter && !hasUsefulValue(layers) && !portfolio && !cost && !review) return "";
+  return `
+    <section class="prediction-layer-section">
+      <div class="section-head compact">
+        <div>
+          <h2>分层判断</h2>
+          <p>先筛比赛，再给主选/次选/小防，不把所有可能性平均铺开。</p>
+        </div>
+      </div>
+      <div class="layer-grid">
+        ${renderLayerPanel("比赛筛选", matchFilter, "模型未给出比赛筛选。", "accent")}
+        ${renderLayerPanel("主选", layers.main_pick || layers.mainPick || layers.primary || layers.main, "未给出主选。")}
+        ${renderLayerPanel("次选", layers.secondary_pick || layers.secondaryPick || layers.secondary, "未给出次选。")}
+        ${renderLayerPanel("小防", layers.small_hedge || layers.smallHedge || layers.hedge, "未给出小防。")}
+        ${renderLayerPanel("不建议", layers.avoid_pick || layers.avoidPick || layers.avoid, "未给出不建议选项。")}
+        ${renderLayerPanel("组合结构", portfolio, "未给出主单/保护单/搏冷单结构。", "wide")}
+        ${renderLayerPanel("成本效率", cost, "未给出成本效率判断。", "wide")}
+        ${renderLayerPanel("复盘检查点", review, "未给出复盘检查点。", "wide")}
+      </div>
+    </section>
+  `;
+}
+
 function actualWinner(match) {
   if (!match.score || match.score === "未赛" || !/^\d+-\d+$/.test(match.score)) return "";
   const [homeScore, awayScore] = match.score.split("-").map(Number);
@@ -1135,6 +1192,7 @@ function renderPredictionSummary(prediction) {
         wide: true
       })}
     </div>
+    ${renderOptionLayers(summary)}
   `;
 }
 

@@ -279,6 +279,38 @@ function renderTop3(items) {
   `;
 }
 
+function renderLayerBlock(title, value, fallback = "模型未给出。") {
+  return `
+    <article class="result-card">
+      <span>${escapeHtml(title)}</span>
+      <p>${escapeHtml(valueText(value, fallback))}</p>
+    </article>
+  `;
+}
+
+function renderLayeredPrediction(prediction) {
+  const layers = prediction.option_layers || prediction.optionLayers || {};
+  const matchFilter = prediction.match_filter || prediction.matchFilter || prediction.filter_reason;
+  const portfolio = prediction.portfolio_structure || prediction.portfolioStructure;
+  const cost = prediction.cost_efficiency || prediction.costEfficiency;
+  const review = prediction.review_checklist || prediction.reviewChecklist;
+  return `
+    <div class="prediction-section">
+      <h3>分层判断</h3>
+      <div class="prediction-summary-grid">
+        ${renderLayerBlock("比赛筛选", matchFilter, "模型未给出比赛筛选。")}
+        ${renderLayerBlock("主选", layers.main_pick || layers.mainPick || layers.primary || layers.main, "未给出主选。")}
+        ${renderLayerBlock("次选", layers.secondary_pick || layers.secondaryPick || layers.secondary, "未给出次选。")}
+        ${renderLayerBlock("小防", layers.small_hedge || layers.smallHedge || layers.hedge, "未给出小防。")}
+        ${renderLayerBlock("不建议", layers.avoid_pick || layers.avoidPick || layers.avoid, "未给出不建议选项。")}
+        ${renderLayerBlock("组合结构", portfolio, "未给出主单/保护单/搏冷单结构。")}
+        ${renderLayerBlock("成本效率", cost, "未给出成本效率判断。")}
+        ${renderLayerBlock("复盘检查点", review, "未给出复盘检查点。")}
+      </div>
+    </div>
+  `;
+}
+
 function renderPrediction(payload) {
   if (payload.mode === "prompt-only") {
     predictResult.innerHTML = `
@@ -324,6 +356,7 @@ function renderPrediction(payload) {
       <h3>关键依据</h3>
       <p>${escapeHtml(valueText(prediction.key_evidence || prediction.evidence))}</p>
     </div>
+    ${renderLayeredPrediction(prediction)}
     <div class="prediction-section">
       <h3>娱乐参考前三项</h3>
       ${renderTop3(prediction.entertainment_top3 || prediction.entertainmentTop3)}

@@ -1003,6 +1003,49 @@ summary:focus-visible {
   padding-left: 18px;
 }
 
+.prediction-layer-section {
+  margin: 14px 0;
+}
+
+.prediction-layer-section .section-head p {
+  margin-top: 4px;
+  color: var(--subtle);
+  font-size: 13px;
+}
+
+.layer-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.layer-panel {
+  grid-column: span 4;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.layer-panel.accent {
+  border-color: rgba(47, 111, 236, 0.22);
+  background: #f8fbff;
+}
+
+.layer-panel.wide {
+  grid-column: span 6;
+}
+
+.layer-panel span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .result-card span,
 .mini-prediction-card span,
 .branch-card span {
@@ -2422,10 +2465,11 @@ summary:focus-visible {
   .config-checks,
   .config-weights,
   .weights-grid,
-    .prediction-summary-grid,
-    .entertainment-grid,
-    .branch-grid,
-    .tactical-clean-grid {
+  .prediction-summary-grid,
+  .entertainment-grid,
+  .branch-grid,
+  .layer-grid,
+  .tactical-clean-grid {
     grid-template-columns: 1fr;
   }
 

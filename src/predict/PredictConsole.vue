@@ -138,6 +138,13 @@
                 </article>
               </div>
 
+              <div class="layered-units">
+                <article v-for="item in layeredItems" :key="item.title">
+                  <span>{{ item.title }}</span>
+                  <strong>{{ item.value }}</strong>
+                </article>
+              </div>
+
               <div ref="chartEl" class="chart"></div>
 
               <section class="visible-reasoning">
@@ -216,8 +223,8 @@ const resultWinner = computed(() => valueText(prediction.value?.winner || predic
 const resultConfidence = computed(() => valueText(prediction.value?.confidence || prediction.value?.confidence_score || prediction.value?.source_reliability?.confidence, "未明确"));
 const resultAnalyzable = computed(() => prediction.value?.is_analyzable === false ? "建议跳过" : "可分析 / 谨慎观察");
 const resultSituation = computed(() => summarizeText(prediction.value?.full_time || prediction.value?.fullTime || prediction.value?.situation || prediction.value?.key_evidence, "模型未给出整场局势摘要。"));
-const resultEvidence = computed(() => summarizeText(prediction.value?.key_evidence || prediction.value?.evidence || prediction.value?.filter_reason, "关键依据待补充。"));
-const resultFirstHalf = computed(() => summarizeText(prediction.value?.first_half || prediction.value?.firstHalf, "上半场走势待补充。"));
+const resultEvidence = computed(() => summarizeText(prediction.value?.key_evidence || prediction.value?.evidence || prediction.value?.filter_reason, "暂无明确关键依据。"));
+const resultFirstHalf = computed(() => summarizeText(prediction.value?.first_half || prediction.value?.firstHalf, "暂无明确上半场走势。"));
 const resultGoals = computed(() => valueText(prediction.value?.total_goals || prediction.value?.goals || prediction.value?.goal_line || prediction.value?.over_under || prediction.value?.market_check?.total_goals, "未明确"));
 const resultHalfFull = computed(() => valueText(prediction.value?.half_full || prediction.value?.halfFull || prediction.value?.ht_ft || prediction.value?.entertainment_top3?.[0]?.half_full || prediction.value?.entertainmentTop3?.[0]?.halfFull, "未明确"));
 const resultScore = computed(() => valueText(prediction.value?.score || prediction.value?.score_range || prediction.value?.scoreRange || prediction.value?.entertainment_top3?.[0]?.score || prediction.value?.entertainmentTop3?.[0]?.score, "未明确"));
@@ -228,6 +235,33 @@ const resultReasoning = computed(() => summarizeText(
     || prediction.value?.evidence,
   "本次结果没有返回可展示的分析过程。"
 ));
+const optionLayers = computed(() => prediction.value?.option_layers || prediction.value?.optionLayers || {});
+const layeredItems = computed(() => [
+  {
+    title: "比赛筛选",
+    value: valueText(prediction.value?.match_filter || prediction.value?.matchFilter || prediction.value?.filter_reason, "模型未给出比赛筛选")
+  },
+  {
+    title: "主选",
+    value: valueText(optionLayers.value.main_pick || optionLayers.value.mainPick || optionLayers.value.primary || optionLayers.value.main, "未给出主选")
+  },
+  {
+    title: "次选",
+    value: valueText(optionLayers.value.secondary_pick || optionLayers.value.secondaryPick || optionLayers.value.secondary, "未给出次选")
+  },
+  {
+    title: "小防",
+    value: valueText(optionLayers.value.small_hedge || optionLayers.value.smallHedge || optionLayers.value.hedge, "未给出小防")
+  },
+  {
+    title: "不建议",
+    value: valueText(optionLayers.value.avoid_pick || optionLayers.value.avoidPick || optionLayers.value.avoid, "未给出不建议选项")
+  },
+  {
+    title: "成本效率",
+    value: valueText(prediction.value?.cost_efficiency || prediction.value?.costEfficiency, "未给出成本效率")
+  }
+]);
 
 function zhTeam(name) {
   return teamNameZh[name] || name || "待确认";
@@ -992,7 +1026,8 @@ restoreActiveJob();
 }
 
 .situation-summary span,
-.prediction-units span {
+.prediction-units span,
+.layered-units span {
   display: block;
   color: #6b7280;
   font-size: 12px;
@@ -1015,14 +1050,23 @@ restoreActiveJob();
   line-height: 1.55;
 }
 
-.prediction-units {
+.prediction-units,
+.layered-units {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-top: 14px;
 }
 
-.prediction-units article {
+.prediction-units {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.layered-units {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.prediction-units article,
+.layered-units article {
   min-height: 118px;
   padding: 14px;
   border: 1px solid #e5e7eb;
@@ -1031,12 +1075,23 @@ restoreActiveJob();
   box-shadow: 0 2px 8px rgba(26, 39, 69, 0.05);
 }
 
-.prediction-units strong {
+.prediction-units strong,
+.layered-units strong {
   display: block;
   margin-top: 8px;
   color: #111827;
   font-size: 18px;
   line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.layered-units article {
+  min-height: 96px;
+  background: #f8fbff;
+}
+
+.layered-units strong {
+  font-size: 15px;
 }
 
 .visible-reasoning,
@@ -1220,6 +1275,7 @@ restoreActiveJob();
 
   .stepper,
   .prediction-units,
+  .layered-units,
   .prematch-source-grid {
     grid-template-columns: 1fr;
   }
