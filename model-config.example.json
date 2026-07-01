@@ -39,9 +39,9 @@
     "娱乐比分和半全场只能作为娱乐参考，最多给前三个，不能作为投资建议。"
   ],
   "sourcePolicy": {
-    "tier1": ["FIFA", "国家队/足协官方", "官方首发", "官方发布会"],
-    "tier2": ["ESPN", "FBref", "Transfermarkt", "Sofascore"],
-    "tier3": ["懂球帝", "小红书", "微博", "Reddit"],
-    "rule": "tier3 只能做中文名称、球迷观察、舆情和线索发现，不能单独作为事实结论；伤停、首发、教练表态和战术变化必须尽量交叉验证。"
+    "tier1": ["FIFA 官方赛程比分", "FIFA Match Centre", "FIFA 官方文章", "中国体彩网", "中国竞彩网"],
+    "tier2": ["The Analyst / Opta 世界杯文章"],
+    "tier3": ["Reuters 世界杯新闻", "Reuters 足球新闻", "The Guardian 足球", "CNTV 张路专栏", "CCTV 张路点评旧页", "B站张路公开视频"],
+    "rule": "赛前信息列只使用《信息链接大全.txt》中的固定来源；未列入清单、不可稳定获取或无法命中本场的信息源，直接取消用于本场判断。"
   }
 }

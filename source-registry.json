@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-20",
+  "updatedAt": "2026-07-01",
   "sourceTiers": [
     {
       "tier": "official_fact",
@@ -22,29 +22,47 @@
     },
     {
       "tier": "cn_context",
-      "name": "中文资料/舆情辅助层",
-      "useFor": "中文名、球员常用称呼、球迷观察、线索发现",
+      "name": "中文技战术参考层",
+      "useFor": "张路公开观点、中文技战术表达、可核验的视频或专栏内容",
       "rule": "不能单独作为事实依据，必须回到官方或结构化来源确认。"
     }
   ],
   "stableEntrances": [
     {
-      "id": "guardian-football-minute-by-minute",
-      "name": "The Guardian football minute-by-minute / live",
-      "tier": "media_live",
-      "url": "https://www.theguardian.com/football/football%2Btone/minutebyminute"
+      "id": "fifa-scores-fixtures",
+      "name": "FIFA 官方赛程比分",
+      "tier": "official_fact",
+      "url": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/scores-fixtures"
     },
     {
-      "id": "guardian-live-football-scores",
-      "name": "The Guardian live football scores",
-      "tier": "media_live",
-      "url": "https://www.theguardian.com/football/live"
+      "id": "fifa-articles",
+      "name": "FIFA 官方新闻 / 赛前预览",
+      "tier": "official_fact",
+      "url": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles"
     },
     {
-      "id": "guardian-minute-by-minute",
-      "name": "The Guardian minute-by-minute 总入口",
+      "id": "reuters-world-cup-graphic",
+      "name": "Reuters 世界杯赛程、积分、淘汰赛图",
       "tier": "media_live",
-      "url": "https://www.theguardian.com/tone/minutebyminute"
+      "url": "https://www.reuters.com/graphics/SOCCER-WORLDCUP/mopaoglqkpa/"
+    },
+    {
+      "id": "reuters-world-cup-news",
+      "name": "Reuters 世界杯新闻",
+      "tier": "media_live",
+      "url": "https://www.reuters.com/sports/world-cup/"
+    },
+    {
+      "id": "reuters-soccer-news",
+      "name": "Reuters 足球新闻",
+      "tier": "media_live",
+      "url": "https://www.reuters.com/sports/soccer/"
+    },
+    {
+      "id": "guardian-football",
+      "name": "The Guardian 足球",
+      "tier": "media_live",
+      "url": "https://www.theguardian.com/football"
     },
     {
       "id": "theanalyst-home",
@@ -53,120 +71,138 @@
       "url": "https://theanalyst.com/"
     },
     {
-      "id": "theanalyst-world-cup-predictions",
-      "name": "The Analyst / Opta FIFA World Cup predictions",
+      "id": "theanalyst-world-cup-articles",
+      "name": "The Analyst / Opta 世界杯文章",
       "tier": "structured_data",
-      "url": "https://theanalyst.com/competition/fifa-world-cup/predictions"
+      "url": "https://theanalyst.com/competition/fifa-world-cup/articles"
     },
     {
-      "id": "theanalyst-football-predictions",
-      "name": "The Analyst / Opta football predictions",
-      "tier": "structured_data",
-      "url": "https://theanalyst.com/articles/opta-football-predictions"
-    },
-    {
-      "id": "dongqiudi-world-cup-table",
-      "name": "懂球帝世界杯积分榜",
-      "tier": "cn_context",
-      "url": "https://m.dongqiudi.com/stat/9/rankingTeam"
-    },
-    {
-      "id": "dongqiudi-data",
-      "name": "懂球帝数据入口",
-      "tier": "cn_context",
-      "url": "https://m.dongqiudi.com/stat"
-    },
-    {
-      "id": "dongqiudi-team-example",
-      "name": "懂球帝球队页示例",
-      "tier": "cn_context",
-      "url": "https://www.dongqiudi.com/team/50000330.html"
-    },
-    {
-      "id": "xiaohongshu-explore",
-      "name": "小红书入口",
-      "tier": "cn_context",
-      "url": "https://www.xiaohongshu.com/explore",
-      "note": "动态页，不保证每次都能直接抓到单场内容；只作为中文称呼和线索来源。"
-    },
-    {
-      "id": "fifa-match-centre",
-      "name": "FIFA Match Centre",
+      "id": "lottery-results",
+      "name": "中国体彩网竞彩足球赛果开奖",
       "tier": "official_fact",
-      "url": "https://www.fifa.com/en/match-centre"
+      "url": "https://www.lottery.gov.cn/jc/zqsgkj/"
     },
     {
-      "id": "fifa-live",
-      "name": "FIFA Live",
+      "id": "sporttery-home",
+      "name": "竞彩网官方首页",
       "tier": "official_fact",
-      "url": "https://www.fifa.com/live"
+      "url": "https://www.sporttery.cn/"
     },
     {
-      "id": "fifa-2026-fixtures",
-      "name": "FIFA 2026 World Cup 官方赛程/赛果",
+      "id": "lottery-faq-90min",
+      "name": "竞彩常见问题：90分钟口径",
       "tier": "official_fact",
-      "url": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums"
+      "url": "https://www.lottery.gov.cn/bzzx/yxgz/20191119/10035698.html"
     },
     {
-      "id": "reuters-football-search",
-      "name": "Reuters football / team news search",
-      "tier": "media_live",
-      "url": "https://www.reuters.com/site-search/"
+      "id": "lottery-rule-wdl",
+      "name": "胜平负规则",
+      "tier": "official_fact",
+      "url": "https://www.lottery.gov.cn/bzzx/yxgz/20191119/1060333.html"
     },
     {
-      "id": "ap-news-search",
-      "name": "AP News football / team news search",
-      "tier": "media_live",
-      "url": "https://apnews.com/search"
+      "id": "lottery-rule-handicap",
+      "name": "让球胜平负规则",
+      "tier": "official_fact",
+      "url": "https://www.lottery.gov.cn/bzzx/yxgz/20191119/1060334.html"
     },
     {
-      "id": "bbc-sport-search",
-      "name": "BBC Sport lineups / live search",
-      "tier": "media_live",
-      "url": "https://www.bbc.co.uk/search"
+      "id": "lottery-rule-goals",
+      "name": "总进球数规则",
+      "tier": "official_fact",
+      "url": "https://www.lottery.gov.cn/bzzx/yxgz/20191119/1003195.html"
     },
     {
-      "id": "sky-sports-search",
-      "name": "Sky Sports lineups / live search",
-      "tier": "media_live",
-      "url": "https://www.skysports.com/search"
+      "id": "lottery-rule-score",
+      "name": "比分规则",
+      "tier": "official_fact",
+      "url": "https://www.lottery.gov.cn/bzzx/yxgz/20191119/10026562.html"
     },
     {
-      "id": "espn-soccer",
-      "name": "ESPN Soccer lineups / match centre",
-      "tier": "structured_data",
-      "url": "https://www.espn.com/soccer/"
+      "id": "lottery-rule-half-full",
+      "name": "半全场规则",
+      "tier": "official_fact",
+      "url": "https://www.lottery.gov.cn/bzzx/yxgz/20191119/10026584.html"
+    },
+    {
+      "id": "zhanglu-cntv-column",
+      "name": "CNTV 张路专栏",
+      "tier": "cn_context",
+      "url": "https://sports.cntv.cn/special/pinglun/zhanglu/"
+    },
+    {
+      "id": "zhanglu-cctv-world-cup",
+      "name": "CCTV 世界杯张路点评旧页",
+      "tier": "cn_context",
+      "url": "https://worldcup.cctv.com/program/C15635/23/16/index.shtml"
+    },
+    {
+      "id": "zhanglu-bilibili",
+      "name": "B站搜索：张路",
+      "tier": "cn_context",
+      "url": "https://search.bilibili.com/all?keyword=%E5%BC%A0%E8%B7%AF"
+    },
+    {
+      "id": "zhanglu-zhanjun-bilibili",
+      "name": "B站搜索：张路 詹俊 解说",
+      "tier": "cn_context",
+      "url": "https://search.bilibili.com/all?keyword=%E5%BC%A0%E8%B7%AF%20%E8%A9%B9%E4%BF%8A%20%E8%A7%A3%E8%AF%B4"
     }
   ],
   "prematchUpdateRules": [
     {
       "window": "开赛前 24 小时",
-      "sources": ["Reuters", "AP", "FIFA", "Guardian"],
-      "focus": ["team news", "伤停", "发布会", "预计首发", "战术新闻"]
+      "sources": [
+        "FIFA 官方新闻 / 赛前预览",
+        "Reuters 世界杯新闻",
+        "The Guardian 足球",
+        "The Analyst / Opta 世界杯文章"
+      ],
+      "focus": [
+        "赛前预览",
+        "伤停与阵容线索",
+        "教练赛前表达",
+        "技战术数据文章"
+      ]
     },
     {
       "window": "开赛前 3-6 小时",
-      "sources": ["Reuters team news", "国家队官方账号", "当地记者", "Guardian/BBC/Sky live page"],
-      "focus": ["team news 更新", "官方社媒", "当地记者", "直播页是否开启"]
+      "sources": [
+        "FIFA 官方赛程比分",
+        "Reuters 足球新闻",
+        "Reuters 世界杯新闻",
+        "The Guardian 足球"
+      ],
+      "focus": [
+        "球队最新动态",
+        "赛前新闻更新",
+        "是否出现本场明确报道",
+        "信息是否能命中双方球队"
+      ]
     },
     {
       "window": "开赛前 60-75 分钟",
-      "sources": ["FIFA Match Centre / FIFA App", "两队官方社媒", "赛事官方社媒", "ESPN/BBC/Sky/Guardian lineups"],
-      "focus": ["意外首发", "中锋", "后腰", "进攻型边后卫", "核心轮休", "阵型变化", "热身伤退"]
+      "sources": [
+        "FIFA Match Centre 单场页",
+        "FIFA 官方赛程比分",
+        "中国体彩网赛果开奖",
+        "中国竞彩网"
+      ],
+      "focus": [
+        "官方首发",
+        "阵型变化",
+        "关键位置人选",
+        "热身伤退或临场变动",
+        "官方结算口径"
+      ]
     }
   ],
   "searchTemplates": [
     {
-      "id": "guardian-single-live",
-      "name": "Guardian 单场直播记录",
-      "tier": "media_live",
-      "query": "site:theguardian.com/football/live \"{teamA}\" \"{teamB}\" \"World Cup 2026\" \"as it happened\""
-    },
-    {
-      "id": "opta-single-analysis",
-      "name": "Opta / The Analyst 单场分析",
-      "tier": "structured_data",
-      "query": "site:theanalyst.com \"{teamA}\" \"{teamB}\" \"World Cup\""
+      "id": "fifa-articles-match",
+      "name": "FIFA 官方文章本场检索",
+      "tier": "official_fact",
+      "query": "site:fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles \"{teamA}\" \"{teamB}\""
     },
     {
       "id": "fifa-match-centre-single",
@@ -175,64 +211,52 @@
       "query": "site:fifa.com/en/match-centre \"{teamA}\" \"{teamB}\""
     },
     {
-      "id": "official-starting-xi-x",
-      "name": "官方首发 X/Twitter",
-      "tier": "official_fact",
-      "query": "site:x.com \"Starting XI\" \"{team}\""
-    },
-    {
-      "id": "official-starting-xi-instagram",
-      "name": "官方首发 Instagram",
-      "tier": "official_fact",
-      "query": "site:instagram.com \"Starting XI\" \"{team}\""
-    },
-    {
-      "id": "official-starting-xi-fa-domain",
-      "name": "官方足协首发",
-      "tier": "official_fact",
-      "query": "site:{officialFaDomain} \"Starting XI\" \"{team}\""
-    },
-    {
-      "id": "official-injury-update",
-      "name": "官方伤停更新",
-      "tier": "official_fact",
-      "query": "site:{officialFaDomain} \"injury update\" \"{team}\""
-    },
-    {
-      "id": "official-press-conference",
-      "name": "官方发布会",
-      "tier": "official_fact",
-      "query": "site:{officialFaDomain} \"press conference\" \"{team}\""
-    },
-    {
-      "id": "youtube-press-conference",
-      "name": "YouTube 发布会",
+      "id": "reuters-world-cup-match",
+      "name": "Reuters 世界杯本场新闻",
       "tier": "media_live",
-      "query": "site:youtube.com \"press conference\" \"{team}\" \"World Cup\""
+      "query": "site:reuters.com/sports/world-cup \"{teamA}\" \"{teamB}\""
     },
     {
-      "id": "zhanglu-migu-cctv",
-      "name": "张路观点：咪咕/央视/央视频",
-      "tier": "cn_context",
-      "query": "(site:miguvideo.com OR site:yangshipin.cn OR site:cctv.com) \"张路\" \"{teamA}\" \"{teamB}\""
+      "id": "reuters-soccer-match",
+      "name": "Reuters 足球本场新闻",
+      "tier": "media_live",
+      "query": "site:reuters.com/sports/soccer \"{teamA}\" \"{teamB}\""
     },
     {
-      "id": "zhanglu-zhanjun-platforms",
-      "name": "张路观点：詹俊张路组合节目",
-      "tier": "cn_context",
-      "query": "\"詹俊\" \"张路\" \"{teamA}\" \"{teamB}\""
+      "id": "guardian-football-match",
+      "name": "The Guardian 足球本场内容",
+      "tier": "media_live",
+      "query": "site:theguardian.com/football \"{teamA}\" \"{teamB}\""
     },
     {
-      "id": "zhanglu-sports-portals",
-      "name": "张路观点：腾讯/直播吧/懂球帝/门户",
-      "tier": "cn_context",
-      "query": "(site:sports.qq.com OR site:zhibo8.com OR site:dongqiudi.com OR site:sports.sina.com.cn OR site:sports.sohu.com) \"张路\" \"{teamA}\" \"{teamB}\""
+      "id": "theanalyst-world-cup-match",
+      "name": "The Analyst / Opta 本场文章",
+      "tier": "structured_data",
+      "query": "site:theanalyst.com/competition/fifa-world-cup/articles \"{teamA}\" \"{teamB}\""
     },
     {
-      "id": "zhanglu-video-clips",
-      "name": "张路观点：B站/微博/视频切片",
+      "id": "lottery-results-match",
+      "name": "中国体彩网赛果开奖",
+      "tier": "official_fact",
+      "query": "site:lottery.gov.cn/jc/zqsgkj \"{teamA}\" \"{teamB}\""
+    },
+    {
+      "id": "zhanglu-cntv-column",
+      "name": "CNTV 张路专栏",
       "tier": "cn_context",
-      "query": "(site:bilibili.com OR site:weibo.com) \"张路\" \"{teamA}\" \"{teamB}\""
+      "query": "site:sports.cntv.cn/special/pinglun/zhanglu \"张路\" \"{teamA}\" \"{teamB}\""
+    },
+    {
+      "id": "zhanglu-cctv-world-cup",
+      "name": "CCTV 世界杯张路点评旧页",
+      "tier": "cn_context",
+      "query": "site:worldcup.cctv.com/program/C15635/23/16/index.shtml \"张路\" \"{teamA}\" \"{teamB}\""
+    },
+    {
+      "id": "zhanglu-bilibili",
+      "name": "B站搜索：张路",
+      "tier": "cn_context",
+      "query": "site:bilibili.com \"张路\" \"{teamA}\" \"{teamB}\""
     }
   ],
   "officialFaDomains": {

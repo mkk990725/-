@@ -112,7 +112,7 @@ function localProfileFor(team) {
   return window.TEAM_PROFILES?.[team] || {
     coach: "待核验",
     summary: "本地还没有完整球队资料。启动服务并同步赛程后，会优先从白名单数据源补球队链接与球员名单。",
-    sourceTier: "事实层优先，舆情层只做辅助。",
+    sourceTier: "事实层优先，中文技战术参考只做辅助。",
     links: []
   };
 }

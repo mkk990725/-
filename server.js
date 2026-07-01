@@ -450,12 +450,12 @@ function prematchPhase(match) {
   if (hours <= 6 && hours >= 1.25) return {
     id: "live-build",
     label: "开赛前 3-6 小时",
-    focus: ["Reuters team news", "国家队官方账号", "当地记者", "Guardian/BBC/Sky live page"]
+    focus: ["FIFA 官方新闻", "Reuters 世界杯新闻", "Guardian 足球", "The Analyst / Opta 文章"]
   };
   return {
     id: "day-before",
     label: "开赛前 24 小时",
-    focus: ["Reuters", "AP", "FIFA", "Guardian", "伤停与发布会", "预计首发变化"]
+    focus: ["FIFA 官方赛程比分", "Reuters 世界杯新闻", "Guardian 足球", "The Analyst / Opta 世界杯文章", "中国体彩网规则口径"]
   };
 }
 
@@ -466,25 +466,28 @@ function prematchSearchSources(match) {
   const manualUrls = MANUAL_MATCH_SOURCE_URLS[manualSourceKey] || {};
   const fifaMatchCentreUrl = manualUrls.fifaMatchCentre || "https://www.fifa.com/en/match-centre";
   const q = encodeURIComponent(`"${home}" "${away}" World Cup team news lineups`);
-  const loose = encodeURIComponent(`${home} ${away} World Cup team news lineups`);
   return [
-    { id: "fifa-fixtures-static", name: "FIFA 官方赛程/球场/分组", tier: "官方静态资料", url: "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums", keywords: [home, away], home, away, collectionMode: "static_once", refreshPolicy: "首次入库；赛程变更时手动复核", dataTargets: ["赛程真实性", "比赛日期", "球场", "分组"] },
-    { id: "fifa-match-centre-overview", name: "FIFA Match Centre - Overview", tier: "官方子页面", url: fifaMatchCentreUrl, manual: true, collectionMode: "official_browser_subpage", refreshPolicy: "单场授权打开后读取", dataTargets: ["比赛状态", "官方 Match Facts", "官方事件摘要"] },
-    { id: "fifa-match-centre-lineups", name: "FIFA Match Centre - Line-ups", tier: "官方子页面", url: fifaMatchCentreUrl, manual: true, collectionMode: "official_browser_subpage", refreshPolicy: "开赛前 60-75 分钟重点复核", dataTargets: ["官方首发", "阵型", "替补", "临场伤退"] },
-    { id: "fifa-match-centre-stats", name: "FIFA Match Centre - Statistics", tier: "官方子页面", url: fifaMatchCentreUrl, manual: true, collectionMode: "official_browser_subpage", refreshPolicy: "赛中/赛后单场授权读取", dataTargets: ["控球", "射门", "xG/技术统计", "比赛事件"] },
-    { id: "fifa-live", name: "FIFA Live", tier: "官方动态源", url: "https://www.fifa.com/live", keywords: [home, away], home, away, collectionMode: "dynamic_summary", refreshPolicy: "赛前时间窗检查摘要，不做高频抓取", dataTargets: ["官方快讯", "首发提示", "比赛事件"] },
-    { id: "reuters-team-news", name: "Reuters team news", tier: "权威媒体", url: `https://www.reuters.com/site-search/?query=${loose}`, keywords: ["team news", "injury", "lineup", home, away], home, away, collectionMode: "dynamic_summary", refreshPolicy: "开赛前 24 小时、3-6 小时各检查一次", dataTargets: ["伤停", "发布会", "预计首发"] },
-    { id: "ap-team-news", name: "AP team news", tier: "权威媒体", url: `https://apnews.com/search?q=${loose}`, keywords: ["injury", "lineup", home, away], home, away, collectionMode: "dynamic_summary", refreshPolicy: "开赛前 24 小时、3-6 小时各检查一次", dataTargets: ["伤停", "赛前新闻", "球队动态"] },
-    { id: "guardian-live", name: "Guardian live / minute-by-minute", tier: "直播/赛前页", url: `https://www.theguardian.com/football/live`, keywords: ["live", home, away], home, away, collectionMode: "dynamic_summary", refreshPolicy: "直播页开启后摘要检查", dataTargets: ["赛前动态", "比赛过程"] },
-    { id: "guardian-search", name: "Guardian match search", tier: "直播/赛前页", url: `https://www.theguardian.com/football/search?q=${loose}`, keywords: [home, away, "team news", "live"], home, away, collectionMode: "dynamic_summary", refreshPolicy: "开赛前 24 小时检查一次", dataTargets: ["单场预览", "直播记录"] },
-    { id: "bbc-search", name: "BBC Sport search", tier: "二次确认", url: `https://www.bbc.co.uk/search?q=${loose}`, keywords: [home, away, "line-ups", "team news"], home, away, collectionMode: "dynamic_summary", refreshPolicy: "开赛前 3-6 小时、60-75 分钟检查", dataTargets: ["首发二次确认", "伤停"] },
-    { id: "sky-search", name: "Sky Sports search", tier: "二次确认", url: `https://www.skysports.com/search?q=${loose}`, keywords: [home, away, "team news", "lineups"], home, away, collectionMode: "dynamic_summary", refreshPolicy: "开赛前 3-6 小时、60-75 分钟检查", dataTargets: ["首发二次确认", "临场消息"] },
-    { id: "espn-soccer", name: "ESPN Soccer", tier: "结构化数据", url: `https://www.espn.com/soccer/`, keywords: [home, away, "lineups"], home, away, collectionMode: "dynamic_summary", refreshPolicy: "赛程和赛中数据按单场摘要更新", dataTargets: ["赛程", "首发", "比分", "技术统计"] },
-    { id: "theanalyst-search", name: "The Analyst / Opta", tier: "结构化数据", url: `https://theanalyst.com/?s=${q}`, keywords: [home, away, "preview", "stats"], home, away, collectionMode: "static_article_once", refreshPolicy: "赛前文章首次发现后入库；有新文章再更新", dataTargets: ["战术数据", "预测模型", "xG/射门质量"] },
-    { id: "sofascore-authorized-match", name: "SofaScore 单场授权页", tier: "结构化数据", url: "https://www.sofascore.com/", manual: true, collectionMode: "authorized_single_match", refreshPolicy: "你提供单场 URL 后读取页面可见摘要，不批量轮询", dataTargets: ["阵容", "评分", "攻势图", "技术统计", "H2H"] },
-    { id: "fotmob-authorized-match", name: "FotMob 单场授权页", tier: "结构化数据", url: "https://www.fotmob.com/", manual: true, collectionMode: "authorized_single_match", refreshPolicy: "你提供单场 URL 后一次整理；遵守 FotMob 对自动化的限制", dataTargets: ["伤停", "排名", "场地", "xG/射门图"] },
-    { id: "x-starting-xi", name: "两队官方 X / 赛事官方社媒", tier: "官方社媒", url: `https://x.com/search?q=${encodeURIComponent(`"Starting XI" "${home}" OR "${away}"`)}`, manual: true, collectionMode: "authorized_social", refreshPolicy: "开赛前 60-75 分钟由你登录后授权查看", dataTargets: ["官方首发", "热身伤退", "训练动态"] },
-    { id: "instagram-starting-xi", name: "两队官方 Instagram", tier: "官方社媒", url: `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(`${home} ${away} Starting XI`)}`, manual: true, collectionMode: "authorized_social", refreshPolicy: "开赛前 60-75 分钟由你登录后授权查看", dataTargets: ["官方首发", "训练图文", "临场动态"] }
+    { id: "fifa-scores-fixtures", name: "FIFA 官方赛程比分", tier: "赛程/比分", url: "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/scores-fixtures", keywords: [home, away], home, away, collectionMode: "static_once", refreshPolicy: "赛程、比分、比赛状态固定核对；非高频轮询", dataTargets: ["赛程真实性", "比分状态", "比赛日期", "分组"] },
+    { id: "fifa-match-centre-overview", name: "FIFA Match Centre 单场页", tier: "官方单场", url: fifaMatchCentreUrl, manual: true, collectionMode: "official_browser_subpage", refreshPolicy: "只在你提供或打开单场页后整理页面可见信息", dataTargets: ["官方首发", "阵型", "事件", "技术统计"] },
+    { id: "fifa-articles", name: "FIFA 官方新闻 / 赛前预览", tier: "赛前新闻", url: "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles", keywords: [home, away, "preview"], home, away, collectionMode: "dynamic_summary", refreshPolicy: "赛前文章摘要检查；未命中本场则取消使用", dataTargets: ["赛前预览", "球队新闻", "官方背景"] },
+    { id: "reuters-world-cup-graphic", name: "Reuters 世界杯赛程、积分、淘汰赛图", tier: "赛程/比分", url: "https://www.reuters.com/graphics/SOCCER-WORLDCUP/mopaoglqkpa/", keywords: [home, away], home, away, collectionMode: "static_once", refreshPolicy: "用于快速核对赛程、积分、淘汰赛路径", dataTargets: ["赛程", "积分", "淘汰赛路径"] },
+    { id: "reuters-world-cup-news", name: "Reuters 世界杯新闻", tier: "权威媒体", url: "https://www.reuters.com/sports/world-cup/", keywords: [home, away, "World Cup"], home, away, collectionMode: "dynamic_summary", refreshPolicy: "赛前新闻摘要检查；未命中本场则取消使用", dataTargets: ["新闻", "结果", "集锦", "积分"] },
+    { id: "reuters-soccer-news", name: "Reuters 足球新闻", tier: "权威媒体", url: "https://www.reuters.com/sports/soccer/", keywords: [home, away, "soccer"], home, away, collectionMode: "dynamic_summary", refreshPolicy: "赛前伤停、发布会、球队动态摘要检查", dataTargets: ["伤停", "发布会", "球队动态"] },
+    { id: "guardian-football", name: "The Guardian 足球", tier: "媒体分析", url: "https://www.theguardian.com/football", keywords: [home, away, "football"], home, away, collectionMode: "dynamic_summary", refreshPolicy: "只保留命中本场的预览、直播或复盘内容", dataTargets: ["赛前预览", "直播记录", "过程描述"] },
+    { id: "theanalyst-world-cup-articles", name: "The Analyst / Opta 世界杯文章", tier: "结构化数据", url: "https://theanalyst.com/competition/fifa-world-cup/articles", keywords: [home, away, "preview", "stats"], home, away, collectionMode: "static_article_once", refreshPolicy: "赛前文章首次发现后入库；有新文章再更新", dataTargets: ["战术数据", "xG/射门质量", "预测模型"] },
+    { id: "theanalyst-search", name: "The Analyst / Opta 单场搜索", tier: "结构化数据", url: `https://theanalyst.com/?s=${q}`, keywords: [home, away, "preview", "stats"], home, away, collectionMode: "static_article_once", refreshPolicy: "辅助查找单场文章；搜索页未命中有效正文则取消使用", dataTargets: ["单场文章", "真实表现数据"] },
+    { id: "lottery-results", name: "中国体彩网竞彩足球赛果开奖", tier: "竞彩官方", url: "https://www.lottery.gov.cn/jc/zqsgkj/", keywords: [home, away], home, away, collectionMode: "static_once", refreshPolicy: "用于开奖和赛果口径核对", dataTargets: ["赛果开奖", "官方结算口径"] },
+    { id: "sporttery-home", name: "竞彩网官方首页", tier: "竞彩官方", url: "https://www.sporttery.cn/", keywords: [home, away], home, away, collectionMode: "static_once", refreshPolicy: "用于竞彩足球赛程、开奖、比分直播口径核对", dataTargets: ["竞彩赛程", "开奖", "比分直播"] },
+    { id: "lottery-faq-90min", name: "竞彩常见问题：90分钟口径", tier: "竞彩规则", url: "https://www.lottery.gov.cn/bzzx/yxgz/20191119/10035698.html", keywords: ["90分钟", "伤停补时"], collectionMode: "static_once", refreshPolicy: "规则固定，首次入库后不轮询", dataTargets: ["90分钟含伤停补时", "结算口径"] },
+    { id: "lottery-rule-wdl", name: "胜平负规则", tier: "竞彩规则", url: "https://www.lottery.gov.cn/bzzx/yxgz/20191119/1060333.html", keywords: ["胜平负"], collectionMode: "static_once", refreshPolicy: "规则固定，首次入库后不轮询", dataTargets: ["胜平负规则"] },
+    { id: "lottery-rule-handicap", name: "让球胜平负规则", tier: "竞彩规则", url: "https://www.lottery.gov.cn/bzzx/yxgz/20191119/1060334.html", keywords: ["让球胜平负"], collectionMode: "static_once", refreshPolicy: "规则固定，首次入库后不轮询", dataTargets: ["让球胜平负规则"] },
+    { id: "lottery-rule-goals", name: "总进球数规则", tier: "竞彩规则", url: "https://www.lottery.gov.cn/bzzx/yxgz/20191119/1003195.html", keywords: ["总进球数"], collectionMode: "static_once", refreshPolicy: "规则固定，首次入库后不轮询", dataTargets: ["总进球数规则"] },
+    { id: "lottery-rule-score", name: "比分规则", tier: "竞彩规则", url: "https://www.lottery.gov.cn/bzzx/yxgz/20191119/10026562.html", keywords: ["比分"], collectionMode: "static_once", refreshPolicy: "规则固定，首次入库后不轮询", dataTargets: ["比分规则"] },
+    { id: "lottery-rule-half-full", name: "半全场规则", tier: "竞彩规则", url: "https://www.lottery.gov.cn/bzzx/yxgz/20191119/10026584.html", keywords: ["半全场"], collectionMode: "static_once", refreshPolicy: "规则固定，首次入库后不轮询", dataTargets: ["半全场规则"] },
+    { id: "zhanglu-cntv-column", name: "CNTV 张路专栏", tier: "技战术观点", url: "https://sports.cntv.cn/special/pinglun/zhanglu/", keywords: ["张路"], collectionMode: "static_once", refreshPolicy: "只用于技战术观点查找，不命中具体比赛则不作为本场证据", dataTargets: ["张路技战术观点"] },
+    { id: "zhanglu-cctv-world-cup", name: "CCTV 世界杯张路点评旧页", tier: "技战术观点", url: "https://worldcup.cctv.com/program/C15635/23/16/index.shtml", keywords: ["张路"], collectionMode: "static_once", refreshPolicy: "只用于历史观点参考，不冒充本场观点", dataTargets: ["张路历史点评"] },
+    { id: "zhanglu-bilibili", name: "B站搜索：张路", tier: "技战术观点", url: "https://search.bilibili.com/all?keyword=%E5%BC%A0%E8%B7%AF", manual: true, collectionMode: "authorized_reference", refreshPolicy: "仅人工查看公开视频标题和内容，不自动抓取", dataTargets: ["张路公开视频"] },
+    { id: "zhanglu-zhanjun-bilibili", name: "B站搜索：张路 詹俊 解说", tier: "技战术观点", url: "https://search.bilibili.com/all?keyword=%E5%BC%A0%E8%B7%AF%20%E8%A9%B9%E4%BF%8A%20%E8%A7%A3%E8%AF%B4", manual: true, collectionMode: "authorized_reference", refreshPolicy: "仅人工查看公开视频标题和内容，不自动抓取", dataTargets: ["张路/詹俊解说观点"] }
   ];
 }
 
@@ -496,11 +499,8 @@ async function fetchSourcePreview(source) {
     if (source.collectionMode === "authorized_single_match") {
       return "需要你登录后提供具体单场 URL；系统只整理该场页面可见信息，不做批量轮询。";
     }
-    if (source.id.includes("instagram")) {
-      return "需要 Instagram 可访问账号或你提供官方账号截图/链接。";
-    }
-    if (source.id.includes("x-")) {
-      return "需要 X/Twitter 可访问账号或你提供两队官方账号的首发/伤停截图。";
+    if (source.collectionMode === "authorized_reference") {
+      return "需要你人工打开该观点入口；系统只记录可核验的公开标题、正文或你提供的截图，不自动抓取。";
     }
     return "需要你打开授权页面或提供页面截图/正文后再入库。";
   };
@@ -1248,7 +1248,7 @@ function buildEvaluationPrompt(analysisInput, config) {
   return [
     "你是张路式足球分析 Agent。你的目标不是评价页面，也不是从赔率最低项出发，而是像懂球的评论员一样，基于球队技战术、人员功能、比赛机制、赛前信息和数据判断比赛走势。",
     "大模型负责主要分析与判断；技能只告诉你如何使用数据、如何过滤、如何表达不确定性，不要把技能写成死板打分公式。",
-    "必须先做信息源充足性与真实性校验：区分官方事实、结构化数据、媒体报道、舆情线索、模型推断；识别未经交叉验证的伤停、首发、战术烟雾弹和市场噪声。信息源不足时必须降级或跳过。",
+    "必须先做信息源充足性与真实性校验：区分官方事实、结构化数据、权威媒体报道、中文技战术参考、模型推断；识别未经交叉验证的伤停、首发、战术烟雾弹和市场噪声。信息源不足时必须降级或跳过。",
     "必须输出：1）比赛筛选：适合做稳腿/适合搏冷/不建议碰/只适合小注比分；2）信息源校验；3）上半场走势；4）全场走势边界；5）选项分层：主选/次选/小防/不建议；6）组合结构：主单/保护单/搏冷单/小注高赔池；7）成本效率；8）复盘检查点；9）娱乐参考的前三个比分与半全场选项。",
     "如果信息源不足，必须明确列出缺哪些信息、去哪类来源补：The Guardian 比赛直播记录、The Analyst/Opta 赛前和数据分析文章、FIFA 官方技术统计、全场录像观察、官方首发/伤停/发布会。",
     "分析球队整体时必须区分控球/推进/射门数量与稳定破门能力。优先寻找能表达真实表现质量的数据族，例如机会质量、射门位置与每脚射门质量、禁区触球、重大机会、定位球质量、压迫强度、推进到三区次数和防线承压。xG、每脚射门平均 xG 只是这类数据的例子，不是唯一指标。示例：如果球队首轮射门很多但每脚射门质量很低，应警惕其进攻被射门数量高估。小组赛第二轮以后必须考虑对手研究第一轮样本后的针对性调整。",

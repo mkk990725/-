@@ -1270,7 +1270,7 @@ function showAppToast({ title, message, type = "success", duration = 3000 }) {
 function renderPrematchInfo(info) {
   if (!el.prematchPanel) return;
   if (!info) {
-    el.prematchPanel.innerHTML = `<div class="empty-state">点击“更新”后，系统只检查合规且命中本场目标的信息源；不合规、不可稳定获取或未命中本场的信息源会直接取消使用。</div>`;
+    el.prematchPanel.innerHTML = `<div class="empty-state">点击“更新”后，只检查《信息链接大全.txt》里的固定来源；未列入清单、不可稳定获取或未命中本场的信息源会直接取消使用。</div>`;
     return;
   }
   const accessible = (info.items || []).filter((item) => item.status === "checked");
@@ -1366,7 +1366,7 @@ async function updatePrematchInfoForSelectedMatch() {
     message: `${match.home} vs ${match.away}：正在检查官方、通讯社、主流媒体和数据入口。`,
     duration: 2200
   });
-  el.prematchPanel.innerHTML = `<div class="empty-state">正在检查赛前信息源，优先验证官方、通讯社、主流媒体和数据入口...</div>`;
+  el.prematchPanel.innerHTML = `<div class="empty-state">正在检查《信息链接大全.txt》中的 FIFA、Reuters、Guardian、The Analyst / Opta、体彩和张路公开入口...</div>`;
   try {
     const response = await fetch("/api/prematch-update", {
       method: "POST",

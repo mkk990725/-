@@ -114,7 +114,7 @@ function renderConfig() {
   document.getElementById("sourcePolicy").innerHTML = `
     <p><strong>事实层：</strong>${escapeHtml((sourcePolicy.tier1 || []).join("、"))}</p>
     <p><strong>结构化数据层：</strong>${escapeHtml((sourcePolicy.tier2 || []).join("、"))}</p>
-    <p><strong>舆情/中文辅助层：</strong>${escapeHtml((sourcePolicy.tier3 || []).join("、"))}</p>
+    <p><strong>中文技战术参考层：</strong>${escapeHtml((sourcePolicy.tier3 || []).join("、"))}</p>
     <p>${escapeHtml(sourcePolicy.rule || "")}</p>
   `;
 }
