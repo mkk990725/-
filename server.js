@@ -17,6 +17,7 @@ const MODEL_CONFIG = path.join(__dirname, "model-config.json");
 const MODEL_CONFIG_EXAMPLE = path.join(__dirname, "model-config.example.json");
 const SOURCE_REGISTRY = path.join(__dirname, "source-registry.json");
 const DB_FILE = path.join(__dirname, "football-agent.db");
+const DIST_DIR = path.join(__dirname, "dist");
 const PREMATCH_SKILL = path.join(__dirname, "agent-skills", "prematch-analysis.md");
 const LEARNING_SKILL = path.join(__dirname, "agent-skills", "learning-failures.md");
 const PREDICTION_CACHE = path.join(CACHE_DIR, "predictions.json");
@@ -259,6 +260,11 @@ function jsonResponse(res, status, data) {
 function safeStaticPath(urlPath) {
   const cleanPath = decodeURIComponent(urlPath.split("?")[0]);
   const target = cleanPath === "/" ? "index.html" : cleanPath.replace(/^\/+/, "");
+  if (target === "predict.html" || target.startsWith("assets/")) {
+    const distAbsolute = path.resolve(DIST_DIR, target);
+    if (!distAbsolute.startsWith(DIST_DIR)) return null;
+    return distAbsolute;
+  }
   const absolute = path.resolve(__dirname, target);
   if (!absolute.startsWith(__dirname)) return null;
   return absolute;
